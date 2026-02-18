@@ -27,7 +27,7 @@ const someAsyncOperation = async () => {
 
 module.exports = { someAsyncOperation };
 
-const client = new Discord.Client({ 
+const client = new Client({
   intents: [ 
 GatewayIntentBits.Guilds,
 GatewayIntentBits.GuildMembers,
