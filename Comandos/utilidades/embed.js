@@ -1,5 +1,5 @@
 const { EmbedBuilder, ModalBuilder, TextInputBuilder, PermissionFlagsBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
-const config = require("../../config.json");
+const config = require('../../DataBaseJson/config.json');
 const { General, emoji } = require("../../DataBaseJson");
 
 module.exports = {
