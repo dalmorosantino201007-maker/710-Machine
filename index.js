@@ -1,19 +1,9 @@
 require('dotenv').config();
-const { 
-    Client, 
-    GatewayIntentBits, 
-    Collection, 
-    Partials, 
-    EmbedBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    ActionRowBuilder, 
-    PermissionFlagsBits 
-} = require('discord.js');
-
+const { Client, GatewayIntentBits, Collection, Partials, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
-const path = require('path'); // Para que no falle la línea 171
-const config = require('./DataBaseJson/config.json'); // Para que no falle lo de "config"
+const path = require('path');
+const sqlite3 = require('sqlite3').verbose(); // <--- LA PIEZA QUE FALTABA
+const config = require('./DataBaseJson/config.json');
 
 // Luego sigue tu código normal: const client = new Client({ ... });
 
