@@ -1,17 +1,20 @@
-require('dotenv').config(); // Esto lee el archivo .env
-const { Client, GatewayIntentBits } = require('discord.js');
-const Discord = require("discord.js");
-const path = require('path')
-const sqlite3 = require('sqlite3').verbose();
-const config = require("./config.json")
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const transcript = require('discord-html-transcripts');
-const speakeasy = require("speakeasy");
-const { Client, GatewayIntentBits, MessageFlags, Partials, EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder, PermissionFlagsBits } = require('discord.js');
-const { QuickDB } = require("quick.db");
-const { totp } = require('otplib');
+require('dotenv').config();
+const { 
+    Client, 
+    GatewayIntentBits, 
+    MessageFlags, 
+    Partials, 
+    EmbedBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    ActionRowBuilder, 
+    PermissionFlagsBits,
+    Collection // Añade esto si usas comandos
+} = require('discord.js');
 const fs = require('fs');
-const registerCommands = require('./utiles/deploy-commands.js'); // o donde esté tu archivo
+const path = require('path');
+
+// Luego sigue tu código normal: const client = new Client({ ... });
 
 const someAsyncOperation = async () => {
   // Simulación de una operación asíncrona
