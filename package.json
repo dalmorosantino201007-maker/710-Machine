@@ -1,0 +1,37 @@
+{
+  "name": "hostmachine",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "Russo",
+  "license": "ISC",
+  "description": "Bot Machine",
+  "dependencies": {
+    "@discordjs/builders": "^1.11.2",
+    "@google-cloud/translate": "^9.0.1",
+    "axios": "^1.8.4",
+    "better-sqlite3": "^11.9.1",
+    "canvas": "^3.1.0",
+    "captcha-canvas": "^3.2.0",
+    "discord-arts": "^0.7.1",
+    "discord-gamecord": "^4.4.2",
+    "discord-html-transcripts": "^3.2.0",
+    "discord.js": "^14.18.0",
+    "openai": "^3.0.0",
+    "dotenv": "^16.4.7",
+    "emoji.js": "^1.0.0",
+    "fs": "^0.0.1-security",
+    "moment": "^2.29.1",
+    "ms": "^2.1.3",
+    "node-fetch": "^2.7.0",
+    "path": "^0.12.7",
+    "quick.db": "^9.1.7",
+    "wio.db": "^4.0.22",
+    "otplib": "^12.0.1",
+    "speakeasy": "^2.0.0",
+    "sqlite3": "^5.0.0"
+  }
+}

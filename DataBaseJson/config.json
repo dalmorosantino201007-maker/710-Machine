@@ -1,0 +1,48 @@
+{
+    "ownerId":"1037094270697492582",
+    "clientId": "1470925924865413306",
+    "guildId": "1469618754282586154",
+    "comandos":"1470928427199631412",
+    "tickets":"1469620089115377827",
+    "sugerencia":"1471009947570409645",
+    "reglas":"1469950357785546853",
+    "payments":"1469950897910976562",
+    "feedback":"1470869238397931645",
+    "staffsoporte":"1469967630365622403",
+    "eventas":"1469968666425823274",
+    "colorpredeterminado":"#000001",
+    "token":"",
+    "sugerir_canal":"1469950357785546853",
+    "ticket":{
+        "ticket1":{
+            "nome":"Compra",
+            "desc":" Buy Products",
+            "categoria":"1469945642909438114"
+        },
+        "ticket2":{
+            "nome":"Soporte",
+            "desc":"Receive support for any product purchased from Host",
+            "categoria":"1469621686155346042"
+        },
+        "ticket3":{
+            "nome":"Partner",
+            "desc":"Be a Host Partner",
+            "categoria":"1471010330229477528"
+        }
+        },
+    "embedgeral":"#000001",
+    "formulario":{
+        "pergunta_1":{
+            "pergunta":"¿Por qué quieres formar parte del equipo de nuestra shop?",
+            "descrição":"Sientete Libre"
+        },
+        "pergunta_2":{
+            "pergunta":"¿Qué puedes aportarle al equipo de la shop?",
+            "descrição":"Sientete Libre"
+        },
+        "pergunta_3":{
+            "pergunta":"¿Cómo te ves en el futuro?",
+            "descrição":"Sientete Libre"
+        }
+    }
+}
