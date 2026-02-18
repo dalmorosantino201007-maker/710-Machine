@@ -2,17 +2,10 @@ require('dotenv').config();
 const { 
     Client, 
     GatewayIntentBits, 
-    MessageFlags, 
+    Collection, // <--- ESTO DEBE ESTAR AQUÍ
     Partials, 
-    EmbedBuilder, 
-    ButtonBuilder, 
-    ButtonStyle, 
-    ActionRowBuilder, 
-    PermissionFlagsBits,
-    Collection // Añade esto si usas comandos
+    EmbedBuilder 
 } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
 
 // Luego sigue tu código normal: const client = new Client({ ... });
 
@@ -168,7 +161,7 @@ client.on('ready', async () => {
 });
 
 
-client.slashCommands = new Discord.Collection()
+client.slashCommands = new Collection()
 
 client.login(config.token)
 
