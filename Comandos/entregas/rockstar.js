@@ -40,7 +40,7 @@ module.exports = {
         `**•  __Producto__:** Rockstar Account\n\n` +
         `**•  Account(s):** ||${account}||\n` +
         `**•  Login:** [Haz Click Aqui](https://signin.rockstargames.com/signin/user-form?cid=rsg&returnUrl=%2F)\n\n` +
-        `Déjanos por favor un ${config.feedback} para poder seguir creciendo! <a:blackverify:1360058374456348846><:coramanos:1387181348069838942>`
+        `Déjanos por favor una para poder seguir creciendo!`
       );
 
     // 1. Confirmación efímera para el staff

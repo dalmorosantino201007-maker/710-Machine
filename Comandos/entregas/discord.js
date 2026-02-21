@@ -40,7 +40,7 @@ module.exports = {
         `**•  __Producto__:** Discord Account\n\n` +
         `**•  Account(s):** ||${account}||\n` +
         `**•  Login:** [Haz Click Aqui](https://canary.discord.com/login)\n\n` +
-        `Déjanos por favor un ${config.feedback} para poder seguir creciendo! <a:blackverify:1360058374456348846><:coramanos:1387181348069838942>`
+        `Déjanos por favor una reseña para poder seguir creciendo!`
       );
 
     // 1. Confirmación efímera para el moderador

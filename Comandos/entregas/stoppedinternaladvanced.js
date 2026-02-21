@@ -41,7 +41,7 @@ module.exports = {
         `**•  Key(s):** ||${key}||\n` +
         `**•  Download:** [Haz Click Aqui](https://discord.com/channels/1469618754282586154/1470994997456408703)\n` +
         `**•  Tutorial:** ||https://www.youtube.com/watch?v=QXq2BAWUMec||\n\n` +
-        `Déjanos por favor un ${config.feedback} para poder seguir creciendo! <a:blackverify:1360058374456348846><:coramanos:1387181348069838942>`
+        `Déjanos por favor una reseña para poder seguir creciendo!`
       );
 
     // 1. Confirmación efímera para el staff

@@ -41,7 +41,7 @@ module.exports = {
         `**•  Key(s):** ||${key}||\n` +
         `**•  Download:** ||https://cdn.sharksoftwares.com.br/download||\n` +
         `**•  Discord:** ||https://discord.gg/E3wxkxBpNH||\n\n` +
-        `Déjanos por favor un ${config.feedback} para poder seguir creciendo! <a:blackverify:1360058374456348846><:coramanos:1387181348069838942>`
+        `Déjanos por favor una para poder seguir creciendo!`
       );
 
     // 1. Confirmación efímera para el staff
