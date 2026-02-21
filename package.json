@@ -18,7 +18,7 @@
     "captcha-canvas": "^3.2.0",
     "discord-arts": "^0.7.1",
     "discord-gamecord": "^3.4.4",
-    "discord-html-transcripts": "^3.2.0",
+    "discord-html-transcripts": "^2.6.1",
     "discord.js": "^13.17.1",
     "dotenv": "^16.6.1",
     "emoji.js": "^1.0.0",

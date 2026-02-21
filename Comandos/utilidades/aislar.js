@@ -1,45 +1,39 @@
-const {
-  EmbedBuilder,
-  PermissionFlagsBits,
-  ApplicationCommandOptionType
-} = require("discord.js");
-
-const ms = require("ms"); // Asegúrate de tener esta librería instalada
+const Discord = require("discord.js");
+const ms = require("ms");
 
 module.exports = {
   name: "aislar",
-  description: "🚫 | Aísla temporalmente a un usuario.",
-  type: 1,
+  description: "🚫 | Aísla temporalmente a un usuario (Timeout).",
   options: [
     {
       name: "usuario",
       description: "Usuario que quieres aislar",
-      type: ApplicationCommandOptionType.User,
+      type: 6, // USER
       required: true
     },
     {
       name: "duracion",
       description: "Duración del aislamiento (ej: 10m, 1h, 1d)",
-      type: ApplicationCommandOptionType.String,
+      type: 3, // STRING
       required: true
     },
     {
       name: "motivo",
       description: "Motivo del aislamiento",
-      type: ApplicationCommandOptionType.String,
+      type: 3, // STRING
       required: false
     },
     {
       name: "evidencia",
       description: "Link o descripción de la evidencia",
-      type: ApplicationCommandOptionType.String,
+      type: 3, // STRING
       required: false
     }
   ],
 
   run: async (client, interaction) => {
-    const rolPermitido = "1469968983494099160"; // Reemplaza con el rol de staff/moderador autorizado
-    const canalLogsID = "1471003008622919896"; // Canal de logs
+    const rolPermitido = "1469968983494099160"; 
+    const canalLogsID = "1471003008622919896"; 
 
     if (!interaction.member.roles.cache.has(rolPermitido)) {
       return interaction.reply({
@@ -62,6 +56,7 @@ module.exports = {
       });
     }
 
+    // Validar duración (Max 28 días por limitación de Discord)
     if (!duracionMs || duracionMs < 1000 || duracionMs > ms("28d")) {
       return interaction.reply({
         content: "⏱️ Ingresa una duración válida entre 1s y 28d. Ej: `10m`, `2h`, `1d`.",
@@ -69,7 +64,8 @@ module.exports = {
       });
     }
 
-    if (miembro.isCommunicationDisabled()) {
+    // En v13 se verifica si tiene el timestamp activo
+    if (miembro.communicationDisabledUntilTimestamp > Date.now()) {
       return interaction.reply({
         content: "⚠️ Ese usuario ya está aislado.",
         ephemeral: true
@@ -77,20 +73,16 @@ module.exports = {
     }
 
     try {
-      // Enviar DM al usuario
-      try {
-        await usuario.send(`🚫 Has sido aislado en **${interaction.guild.name}** por **${ms(duracionMs, { long: true })}**.\n**Motivo:** ${motivo}`);
-      } catch (err) {
-        console.warn(`No se pudo enviar DM al usuario: ${usuario.tag}`);
-      }
+      // Intentar enviar DM
+      await usuario.send(`🚫 Has sido aislado en **${interaction.guild.name}** por **${ms(duracionMs, { long: true })}**.\n**Motivo:** ${motivo}`).catch(() => {});
 
-      // Aplicar timeout
+      // Aplicar Timeout en v13
       await miembro.timeout(duracionMs, motivo);
 
-      // Embed de confirmación
-      const embedConfirmacion = new EmbedBuilder()
+      // Embed de confirmación (v13)
+      const embedConfirmacion = new Discord.MessageEmbed()
         .setTitle("⏳ Usuario aislado temporalmente")
-        .setColor("Orange")
+        .setColor("ORANGE")
         .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: false },
@@ -99,75 +91,43 @@ module.exports = {
           { name: "📄 Motivo", value: motivo, inline: false },
           { name: "📎 Evidencia", value: evidencia, inline: false }
         )
-        .setFooter({ 
-  text: client.user.username, 
-  iconURL: client.user.displayAvatarURL({ dynamic: true }) 
-})
+        .setFooter(client.user.username, client.user.displayAvatarURL({ dynamic: true }))
         .setTimestamp();
 
-        // Si la evidencia es una URL válida de imagen, se agrega al embed
-if (evidencia.startsWith("http") && /\.(png|jpe?g|gif|webp)$/.test(evidencia)) {
-  embedConfirmacion.setImage(evidencia);
-}
+      if (evidencia.startsWith("http") && /\.(png|jpe?g|gif|webp)$/.test(evidencia)) {
+        embedConfirmacion.setImage(evidencia);
+      }
 
       await interaction.reply({ embeds: [embedConfirmacion] });
 
-      // Log embed
-      const embedLog = new EmbedBuilder()
-        .setTitle("🚫 Usuario Aislado (Timeout)")
-        .setColor("Red")
-        .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: true },
-          { name: "🕒 Duración", value: ms(duracionMs, { long: true }), inline: true },
-          { name: "🛠️ Moderador", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
-          { name: "📄 Motivo", value: motivo, inline: false },
-          { name: "📎 Evidencia", value: evidencia, inline: false }
-        )
-        .setFooter({ text: "Log de moderación | Aislamiento temporal" })
-        .setTimestamp();
-
-        
-if (evidencia.startsWith("http") && /\.(png|jpe?g|gif|webp)$/.test(evidencia)) {
-  embedLog.setImage(evidencia);
-}
-
+      // Log Embed
       const canalLogs = interaction.guild.channels.cache.get(canalLogsID);
-      if (canalLogs && canalLogs.isTextBased()) {
+      if (canalLogs && canalLogs.type === "GUILD_TEXT") {
+        const embedLog = new Discord.MessageEmbed()
+          .setTitle("🚫 Usuario Aislado (Timeout)")
+          .setColor("RED")
+          .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
+          .addFields(
+            { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: true },
+            { name: "🕒 Duración", value: ms(duracionMs, { long: true }), inline: true },
+            { name: "🛠️ Moderador", value: `${interaction.user.tag} (${interaction.user.id})`, inline: false },
+            { name: "📄 Motivo", value: motivo, inline: false },
+            { name: "📎 Evidencia", value: evidencia, inline: false }
+          )
+          .setFooter("Log de moderación | Aislamiento temporal")
+          .setTimestamp();
+
+        if (evidencia.startsWith("http") && /\.(png|jpe?g|gif|webp)$/.test(evidencia)) {
+          embedLog.setImage(evidencia);
+        }
+
         await canalLogs.send({ embeds: [embedLog] });
       }
-
-      // Notificar desaislamiento cuando termine el timeout
-      setTimeout(async () => {
-        const miembroActualizado = await interaction.guild.members.fetch(usuario.id).catch(() => null);
-        if (miembroActualizado && !miembroActualizado.isCommunicationDisabled()) {
-          try {
-            await usuario.send(`🔊 Has sido desaislado en **${interaction.guild.name}**.\nTu aislamiento ha finalizado automáticamente.`);
-          } catch (err) {
-            console.warn(`No se pudo enviar DM al usuario desaislado: ${usuario.tag}`);
-          }
-
-          const embedFin = new EmbedBuilder()
-            .setTitle("🔊 Usuario Desaislado")
-            .setColor("Green")
-            .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
-            .addFields(
-              { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: true },
-              { name: "⏱️ Motivo", value: "Finalizó el tiempo de aislamiento.", inline: true }
-            )
-            .setFooter({ text: "Log de moderación | Timeout finalizado" })
-            .setTimestamp();
-
-          if (canalLogs && canalLogs.isTextBased()) {
-            await canalLogs.send({ embeds: [embedFin] });
-          }
-        }
-      }, duracionMs);
 
     } catch (error) {
       console.error("Error al aislar:", error);
       return interaction.reply({
-        content: "❌ Ocurrió un error al intentar aislar al usuario.",
+        content: "❌ Ocurrió un error al intentar aislar al usuario. Asegúrate de que mi rol esté por encima del suyo.",
         ephemeral: true
       });
     }

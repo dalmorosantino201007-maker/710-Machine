@@ -1,15 +1,14 @@
 const Discord = require("discord.js");
-const config = require('../../config.json');
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
   name: "sugerencia",
   description: "💡 | Envía una sugerencia al servidor",
-  type: Discord.ApplicationCommandType.ChatInput,
   options: [
     {
       name: "contenido",
       description: "Contenido de la sugerencia",
-      type: Discord.ApplicationCommandOptionType.String,
+      type: 3, // En v13, 3 corresponde a STRING
       required: true,
     },
   ],
@@ -19,24 +18,25 @@ module.exports = {
     const user = interaction.user;
     const guild = interaction.guild;
 
-    const suggestionChannelId = "1469948677299634260"; // Reemplaza con tu ID real
+    const suggestionChannelId = "1469948677299634260"; 
     const channel = client.channels.cache.get(suggestionChannelId);
 
-    if (!channel || channel.type !== Discord.ChannelType.GuildText) {
+    // En v13 el tipo se verifica con el string 'GUILD_TEXT'
+    if (!channel || channel.type !== 'GUILD_TEXT') {
       return interaction.reply({
         content: "❌ | No se pudo encontrar el canal de sugerencias o no es un canal de texto.",
         ephemeral: true,
       });
     }
 
-    const embed = new Discord.EmbedBuilder()
+    const embed = new Discord.MessageEmbed()
       .setColor(`${config.colorpredeterminado}`)
       .setTitle("📢 **¡__Nueva sugerencia__!**")
       .setDescription(`\`\`\`${suggestion}\`\`\``)
-      .setThumbnail(user.displayAvatarURL({ dynamic: true })) // Avatar del usuario como thumbnail
+      .setThumbnail(user.displayAvatarURL({ dynamic: true }))
       .setFooter({
         text: "Host | Sistema de Sugerencias",
-        iconURL: guild.iconURL({ dynamic: true }) || user.displayAvatarURL({ dynamic: true }) // Icono del servidor o fallback
+        iconURL: guild.iconURL({ dynamic: true }) || user.displayAvatarURL({ dynamic: true })
       })
       .setTimestamp();
 
@@ -47,10 +47,10 @@ module.exports = {
       await msg.react("✅");
       await msg.react("❌");
 
-      // Crear hilo debajo del mensaje
+      // En v13 startThread se ejecuta sobre el mensaje enviado
       const thread = await msg.startThread({
         name: `Debate: ${user.username}`,
-        autoArchiveDuration: 1440, // 24 horas
+        autoArchiveDuration: 1440,
         reason: "Hilo creado para debatir la sugerencia.",
       });
 

@@ -1,11 +1,9 @@
 const Discord = require("discord.js");
-const { link } = require("fs");
-const config = require("../../config.json");
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
-  name: "serverinfo", // Coloque o nome do comando
-  description: "🔨 | Envía la información actual del servidor.", // Coloque a descrição do comando
-  type: Discord.ApplicationCommandType.ChatInput,
+  name: "serverinfo",
+  description: "🔨 | Envía la información actual del servidor.",
 
   run: async (client, interaction) => {
 
@@ -16,14 +14,16 @@ module.exports = {
 
     const criacao = interaction.guild.createdAt.toLocaleDateString("es");
     
+    // En v13 los tipos de canales se filtran por strings específicos
     const canais_total = interaction.guild.channels.cache.size;
-    const canais_texto = interaction.guild.channels.cache.filter(c => c.type === Discord.ChannelType.GuildText).size;
-    const canais_voz = interaction.guild.channels.cache.filter(c => c.type === Discord.ChannelType.GuildVoice).size;
-    const canais_categoria = interaction.guild.channels.cache.filter(c => c.type === Discord.ChannelType.GuildCategory).size;
+    const canais_texto = interaction.guild.channels.cache.filter(c => c.type === 'GUILD_TEXT').size;
+    const canais_voz = interaction.guild.channels.cache.filter(c => c.type === 'GUILD_VOICE').size;
+    const canais_categoria = interaction.guild.channels.cache.filter(c => c.type === 'GUILD_CATEGORY').size;
 
     const color = `${config.colorpredeterminado}`;
 
-    const embed1 = new Discord.EmbedBuilder()
+    // Cambiado a MessageEmbed
+    const embed1 = new Discord.MessageEmbed()
     .setColor(color)
     .setAuthor({ name: nome, iconURL: icon })
     .setThumbnail(icon)
@@ -71,11 +71,12 @@ module.exports = {
         
     );
 
-    const botao = new Discord.ActionRowBuilder().addComponents(
-        new Discord.ButtonBuilder()
-        .setURL(icon)
+    // Cambiado a MessageActionRow y MessageButton
+    const botao = new Discord.MessageActionRow().addComponents(
+        new Discord.MessageButton()
+        .setURL(icon || "https://discord.com") // Fallback por si no hay icono
         .setLabel("Icono del Servidor")
-        .setStyle(Discord.ButtonStyle.Link)
+        .setStyle('LINK') // En v13 se usa el string 'LINK'
     )
 
     interaction.reply({ embeds: [embed1], components: [botao] })

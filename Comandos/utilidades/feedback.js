@@ -1,16 +1,9 @@
-const {
-  ApplicationCommandType,
-  EmbedBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle
-} = require("discord.js");
-const config = require('../../config.json');
+const Discord = require("discord.js");
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
   name: "feedback",
   description: "🔨 | Mensaje Feedback",
-  type: ApplicationCommandType.ChatInput,
 
   run: async (client, interaction) => {
     const requiredRoleId = "1469967630365622403";
@@ -30,7 +23,8 @@ module.exports = {
     const feedbackChannelId = "1470869238397931645";
     const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
 
-    const embed = new EmbedBuilder()
+    // Cambiado a MessageEmbed (v13)
+    const embed = new Discord.MessageEmbed()
       .setColor(`${config.colorpredeterminado}`)
       .setTitle("**__Feedback__**")
       .setThumbnail(guildIcon)
@@ -39,7 +33,7 @@ module.exports = {
         `Tu compra ha sido completada correctamente.\n\n` +
 
         `**💬 Deja tu opinión**\n` +
-        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#${feedbackChannelId}>.\n` +
+        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1470869238397931645>.\n` +
         `> Tu opinión nos ayuda a seguir mejorando nuestros servicios.\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -51,7 +45,7 @@ module.exports = {
         `Your purchase has been successfully processed.\n\n` +
 
         `**💬 Leave your feedback**\n` +
-        `> If you enjoyed your experience, feel free to leave a positive reaction in <#${feedbackChannelId}>.\n` +
+        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1470869238397931645>.\n` +
         `> Your feedback helps us grow and improve.\n\n` +
 
         `**🛠️ Support**\n` +
@@ -60,14 +54,14 @@ module.exports = {
       .setFooter({ text: botName, iconURL: botAvatar })
       .setTimestamp();
 
-    const button = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
+    // Cambiado a MessageActionRow y MessageButton (v13)
+    const button = new Discord.MessageActionRow().addComponents(
+      new Discord.MessageButton()
         .setLabel("💌 Dejar Feedback")
-        .setStyle(ButtonStyle.Link)
+        .setStyle('LINK') // En v13 el estilo es un string en mayúsculas
         .setURL(feedbackChannelLink)
     );
 
     await interaction.reply({ embeds: [embed], components: [button] });
   }
 }
-

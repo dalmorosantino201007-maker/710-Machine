@@ -1,12 +1,12 @@
-const { PermissionFlagsBits } = require("discord.js");
+const Discord = require("discord.js");
 
 module.exports = {
   name: "lock",
   description: "🔒 | Bloquea el canal para ciertos roles.",
-  type: 1, // Chat input (slash command)
 
   run: async (client, interaction) => {
-    if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+    // En v13 se usa el string "ADMINISTRATOR"
+    if (!interaction.member.permissions.has("ADMINISTRATOR")) {
       return interaction.reply({
         content: "<:warninghost:1383935369275379874> | No tienes permiso para usar este comando.",
         ephemeral: true
@@ -14,20 +14,21 @@ module.exports = {
     }
 
     const canal = interaction.channel;
-    const rolBloqueado = "1469619306886205574"; // ID del rol que no podrá escribir ni gestionar hilos
+    const rolBloqueado = "1469619306886205574"; // ID del rol
 
     try {
       // Bloquear visibilidad para @everyone
+      // En v13 los permisos van en MAYÚSCULAS
       await canal.permissionOverwrites.edit(interaction.guild.roles.everyone, {
-        ViewChannel: false
+        VIEW_CHANNEL: false
       });
 
-      // Bloquear mensajes y gestión de hilos para el rol específico
+      // Bloquear mensajes y hilos para el rol específico
       await canal.permissionOverwrites.edit(rolBloqueado, {
-        SendMessages: false,
-        CreatePublicThreads: false,
-        CreatePrivateThreads: false,
-        SendMessagesInThreads: false
+        SEND_MESSAGES: false,
+        CREATE_PUBLIC_THREADS: false,
+        CREATE_PRIVATE_THREADS: false,
+        SEND_MESSAGES_IN_THREADS: false
       });
 
       await interaction.reply({
@@ -42,4 +43,3 @@ module.exports = {
     }
   }
 };
-

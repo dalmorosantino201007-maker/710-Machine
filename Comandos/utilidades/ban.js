@@ -1,37 +1,32 @@
-const {
-  EmbedBuilder,
-  PermissionFlagsBits,
-  ApplicationCommandOptionType
-} = require("discord.js");
+const Discord = require("discord.js");
 
 module.exports = {
   name: "ban",
   description: "🚫 | Banea a un usuario del servidor.",
-  type: 1, // Chat input (slash command)
   options: [
     {
       name: "usuario",
       description: "Usuario que quieres banear",
-      type: ApplicationCommandOptionType.User,
+      type: 6, // USER en v13
       required: true
     },
     {
       name: "motivo",
       description: "Motivo del baneo",
-      type: ApplicationCommandOptionType.String,
+      type: 3, // STRING en v13
       required: false
     },
     {
       name: "evidencia",
       description: "Link o descripción de la evidencia",
-      type: ApplicationCommandOptionType.String,
+      type: 3, // STRING en v13
       required: false
     }
   ],
 
   run: async (client, interaction) => {
-    const rolPermitido = "1469968983494099160"; // <-- Reemplaza con el ID real
-    const canalLogsID = "1471003008622919896"; // Canal donde se mandarán los logs
+    const rolPermitido = "1469968983494099160"; 
+    const canalLogsID = "1471003008622919896"; 
 
     if (!interaction.member.roles.cache.has(rolPermitido)) {
       return interaction.reply({
@@ -60,16 +55,18 @@ module.exports = {
     }
 
     try {
-      // Enviar DM al usuario baneado
-      await usuario.send(`Has sido baneado del servidor **${interaction.guild.name}**.\n**Motivo:** ${motivo}`);
+      // Enviar DM al usuario baneado antes de ejecutar el ban
+      await usuario.send(`Has sido baneado del servidor **${interaction.guild.name}**.\n**Motivo:** ${motivo}`).catch(() => {
+          console.log(`No se le pudo enviar el DM a ${usuario.tag}`);
+      });
 
       // Ejecutar el baneo
       await miembro.ban({ reason: motivo });
 
-      // Crear embed de confirmación
-      const embedConfirmacion = new EmbedBuilder()
+      // Embed de confirmación (v13)
+      const embedConfirmacion = new Discord.MessageEmbed()
         .setTitle("✅ Usuario baneado exitosamente")
-        .setColor("Green")
+        .setColor("GREEN")
         .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: false },
@@ -77,18 +74,15 @@ module.exports = {
           { name: "📄 Motivo", value: motivo, inline: false },
           { name: "📎 Evidencia", value: evidencia, inline: false }
         )
-        .setFooter({ 
-  text: client.user.username, 
-  iconURL: client.user.displayAvatarURL({ dynamic: true }) 
-})
+        .setFooter(client.user.username, client.user.displayAvatarURL({ dynamic: true }))
         .setTimestamp();
 
       await interaction.reply({ embeds: [embedConfirmacion] });
 
-      // Crear embed de logs
-      const embedLog = new EmbedBuilder()
+      // Embed de logs (v13)
+      const embedLog = new Discord.MessageEmbed()
         .setTitle("🚫 Usuario Baneado")
-        .setColor("Red")
+        .setColor("RED")
         .setThumbnail(usuario.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: "👤 Usuario", value: `${usuario.tag} (${usuario.id})`, inline: true },
@@ -96,14 +90,12 @@ module.exports = {
           { name: "📄 Motivo", value: motivo, inline: false },
           { name: "📎 Evidencia", value: evidencia, inline: false }
         )
-        .setFooter({ text: "Log de moderación | Baneo ejecutado" })
+        .setFooter("Log de moderación | Baneo ejecutado")
         .setTimestamp();
 
       const canalLogs = interaction.guild.channels.cache.get(canalLogsID);
-      if (canalLogs && canalLogs.isTextBased()) {
+      if (canalLogs && canalLogs.type === "GUILD_TEXT") {
         await canalLogs.send({ embeds: [embedLog] });
-      } else {
-        console.warn(`Canal de logs no encontrado o no es de texto: ${canalLogsID}`);
       }
 
     } catch (error) {

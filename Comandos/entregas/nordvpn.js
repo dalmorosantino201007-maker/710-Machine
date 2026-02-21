@@ -1,57 +1,55 @@
 const Discord = require("discord.js");
-const config = require('../../config.json');
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
-  name: "nordvpn", // Nombre del comando
-  description: "📦​ | Entrega Nord Vpn", // Descripción
-  type: Discord.ApplicationCommandType.ChatInput,
+  name: "nordvpn",
+  description: "📦 | Entrega Nord Vpn",
   options: [
     {
       name: "account",
       description: "Ingrese la/s account(s).",
-      type: Discord.ApplicationCommandOptionType.String,
+      type: 3, // STRING en v13
       required: true,
     }
   ],
 
   run: async (client, interaction) => {
-    // Verificar si el usuario tiene el rol requerido
-    const requiredRoleId = `${config.eventas}`;"1469968666425823274"
-    const member = interaction.member;
-    const hasRole = member.roles.cache.has(requiredRoleId);"1469968666425823274"
+    // ID del rol de ventas (limpiado de errores)
+    const requiredRoleId = "1469968666425823274";
 
-    if (!hasRole) {
+    // Verificar si el usuario tiene el rol requerido
+    if (!interaction.member.roles.cache.has(requiredRoleId)) {
       return interaction.reply({ 
         content: "<:warninghost:1383935369275379874> | No tienes permiso para usar este comando.", 
         ephemeral: true 
       });
     }
 
-    // Datos
-    const bot = client.user.username;
-    const avatar_bot = client.user.displayAvatarURL({ dynamic: true });
+    const botName = client.user.username;
+    const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const account = interaction.options.getString("account");
 
-    // Embed de entrega
-    const embed = new Discord.EmbedBuilder()
+    // MessageEmbed adaptado a v13
+    const embed = new Discord.MessageEmbed()
       .setTitle("¡Gracias por tu compra! 🎉")
       .setColor(config.colorpredeterminado)
       .setTimestamp()
-      .setFooter({ text: bot, iconURL: avatar_bot })
+      // Si quieres añadir el thumbnail de NordVPN puedes usar .setThumbnail("URL_AQUÍ")
+      .setFooter(botName, botAvatar) // Formato v13: (texto, icono)
       .setDescription(
-        `**•  __Producto__:** Nord Vpn Account\n\n` +
-        `**•  Account(s):** ||${account}||\n` +
-        `**•  Login:** [Haz Click Aqui](https://nordaccount.com/login/identifier?challenge=4%7C1b5cef88c92b4cdba74b9e18cc38ab25)\n\n` +
+        `**•  __Producto__:** Nord Vpn Account\n\n` +
+        `**•  Account(s):** ||${account}||\n` +
+        `**•  Login:** [Haz Click Aqui](https://nordaccount.com/login)\n\n` +
         `Déjanos por favor un ${config.feedback} para poder seguir creciendo! <a:blackverify:1360058374456348846><:coramanos:1387181348069838942>`
       );
 
-    // 1. Enviar mensaje ephemeral al usuario
+    // 1. Respuesta efímera para el staff
     await interaction.reply({
       content: "✅ Producto entregado exitosamente.",
       ephemeral: true
     });
 
-    // 2. Enviar embed públicamente al canal
+    // 2. Envío público al canal
     await interaction.channel.send({ embeds: [embed] });
   }
-}
+};

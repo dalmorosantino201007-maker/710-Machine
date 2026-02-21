@@ -1,15 +1,14 @@
 const Discord = require("discord.js");
-const config = require('../../config.json');
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
   name: "setimagen",
   description: "🖼️ | Cambia el avatar del bot a una imagen animada",
-  type: Discord.ApplicationCommandType.ChatInput,
   options: [
     {
       name: "imagen",
       description: "Selecciona la imagen (GIF preferentemente)",
-      type: Discord.ApplicationCommandOptionType.Attachment,
+      type: 11, // En v13, 11 corresponde a ATTACHMENT
       required: true
     }
   ],
@@ -29,7 +28,7 @@ module.exports = {
 
     const imagen = interaction.options.getAttachment("imagen");
 
-    // Verificar tipo de archivo (opcional)
+    // Verificar tipo de archivo
     if (!imagen.contentType.startsWith("image/")) {
       return interaction.reply({
         content: "❌ | El archivo proporcionado no es una imagen válida.",
@@ -40,7 +39,8 @@ module.exports = {
     try {
       await client.user.setAvatar(imagen.url);
 
-      const embed = new Discord.EmbedBuilder()
+      // Cambiado a MessageEmbed (v13)
+      const embed = new Discord.MessageEmbed()
         .setColor(`${config.colorpredeterminado}`)
         .setTitle("✅ | Avatar actualizado")
         .setDescription("La imagen del bot ha sido actualizada correctamente.")
@@ -52,7 +52,7 @@ module.exports = {
     } catch (err) {
       console.error(err);
       interaction.reply({
-        content: "❌ | Ocurrió un error al cambiar el avatar. Asegúrate de que el archivo sea un `.gif` válido y que el bot tenga permisos.",
+        content: "❌ | Ocurrió un error al cambiar el avatar. Recuerda que Discord tiene un límite de tiempo entre cambios de avatar.",
         ephemeral: true
       });
     }

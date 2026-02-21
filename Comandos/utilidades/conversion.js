@@ -1,22 +1,21 @@
 const Discord = require("discord.js");
 const axios = require("axios");
-const config = require('../../config.json');
+const config = require('../../DataBaseJson/config.json');
 
 module.exports = {
   name: "conversion",
   description: "🔨 | Convierte entre distintas monedas (USD, BRL, EUR, CLP, UYU, ARS).",
-  type: Discord.ApplicationCommandType.ChatInput,
   options: [
     {
       name: "cantidad",
       description: "Cantidad de dinero a convertir.",
-      type: Discord.ApplicationCommandOptionType.Number,
+      type: 10, // NUMBER en v13
       required: true,
     },
     {
       name: "moneda",
       description: "Moneda de origen.",
-      type: Discord.ApplicationCommandOptionType.String,
+      type: 3, // STRING en v13
       required: true,
       choices: [
         { name: "🇦🇷 Peso Argentino (ARS)", value: "ars" },
@@ -30,7 +29,7 @@ module.exports = {
     {
       name: "hacia",
       description: "Moneda destino.",
-      type: Discord.ApplicationCommandOptionType.String,
+      type: 3, // STRING en v13
       required: true,
       choices: [
         { name: "🇦🇷 Peso Argentino (ARS)", value: "ars" },
@@ -56,12 +55,12 @@ module.exports = {
     }
 
     try {
+      // Usando tu API Key proporcionada
       const response = await axios.get(
         `https://v6.exchangerate-api.com/v6/6d207d967c74439569e4b67a/latest/USD`
       );
       const rates = response.data.conversion_rates;
 
-      // Información de cada moneda
       const infoMoneda = {
         ars: { simbolo: "$", nombre: "Pesos Argentinos (ARS)", bandera: "🇦🇷" },
         usd: { simbolo: "USD$", nombre: "Dólares (USD)", bandera: "🇺🇸" },
@@ -71,40 +70,30 @@ module.exports = {
         uyu: { simbolo: "$U", nombre: "Pesos Uruguayos (UYU)", bandera: "🇺🇾" },
       };
 
-      // Tasas relativas a ARS
       const tasas = {
-        usd: rates.ARS,               // 1 USD -> ARS
-        brl: rates.ARS / rates.BRL,   // 1 BRL -> ARS
-        eur: rates.ARS / rates.EUR,   // 1 EUR -> ARS
-        clp: rates.ARS / rates.CLP,   // 1 CLP -> ARS
-        uyu: rates.ARS / rates.UYU,   // 1 UYU -> ARS
-        ars: 1,                       // base
+        usd: rates.ARS,
+        brl: rates.ARS / rates.BRL,
+        eur: rates.ARS / rates.EUR,
+        clp: rates.ARS / rates.CLP,
+        uyu: rates.ARS / rates.UYU,
+        ars: 1,
       };
 
-      let resultado, tipoCambio;
-
+      let resultado;
       if (monedaDestino === "ars") {
-        // cualquier moneda -> ARS
         resultado = cantidad * tasas[monedaOrigen];
-        tipoCambio = `1 ${infoMoneda[monedaOrigen].simbolo} = ${new Intl.NumberFormat("es-AR", {
-          minimumFractionDigits: 2
-        }).format(tasas[monedaOrigen])} ARS`;
       } else if (monedaOrigen === "ars") {
-        // ARS -> cualquier moneda
         resultado = cantidad / tasas[monedaDestino];
-        tipoCambio = `1 ARS = ${(1 / tasas[monedaDestino]).toFixed(4)} ${infoMoneda[monedaDestino].simbolo}`;
       } else {
-        // conversión cruzada (ej: USD -> EUR)
         const enArs = cantidad * tasas[monedaOrigen];
         resultado = enArs / tasas[monedaDestino];
-        tipoCambio = `1 ${infoMoneda[monedaOrigen].simbolo} = ${(tasas[monedaOrigen] / tasas[monedaDestino]).toFixed(4)} ${infoMoneda[monedaDestino].simbolo}`;
       }
 
       const formato = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
-      // Embed
-      const embed = new Discord.EmbedBuilder()
-        .setColor("#000001") // color fijo
+      // Cambiado a MessageEmbed (v13)
+      const embed = new Discord.MessageEmbed()
+        .setColor("#000001")
         .setTitle(`**🔄 __Conversión de Divisas__**`)
         .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
         .setDescription(
@@ -124,7 +113,7 @@ module.exports = {
     } catch (error) {
       console.error("Error al obtener la cotización:", error);
       await interaction.reply({
-        content: "⚠️ | No se pudo obtener la cotización en este momento. Intenta nuevamente más tarde.",
+        content: "⚠️ | No se pudo obtener la cotización. Verifica la API o intenta más tarde.",
         ephemeral: true,
       });
     }
