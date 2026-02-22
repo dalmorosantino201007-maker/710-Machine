@@ -31,6 +31,7 @@ const rolPermitidoId = "1469967630365622403";
 
 client.on('interactionCreate', async (interaction) => {
     
+    // --- MANEJADOR DE SLASH COMMANDS ---
     if (interaction.isCommand()) {
         const cmd = client.slashCommands.get(interaction.commandName);
         if (!cmd) return;
@@ -38,12 +39,14 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
+    // --- MANEJADOR DE BOTONES ---
     if (interaction.isButton()) {
         const { customId, guild, user, member } = interaction;
 
         if (customId === "copiar_cvu" || customId === "copiar_cvu22") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias" || customId === "copiar_alias22") return interaction.reply({ content: "710shop", ephemeral: true });
 
+        // DISPARADORES DE MODALS PARA TICKETS
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             const producto = new TextInputComponent().setCustomId('p_prod').setLabel("¿Qué producto deseas comprar?").setStyle('SHORT').setPlaceholder('Ej: Reseller').setRequired(true);
@@ -68,6 +71,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.showModal(modal);
         }
 
+        // ACCIONES DE STAFF DENTRO DEL TICKET
         if (customId === "claim_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "Solo staff.", ephemeral: true });
             return interaction.reply({ embeds: [new MessageEmbed().setColor("GREEN").setDescription(`✅ El staff ${user} ha reclamado este ticket.`)] });
@@ -75,7 +79,7 @@ client.on('interactionCreate', async (interaction) => {
 
         if (customId === "notify_user") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "Solo staff.", ephemeral: true });
-            interaction.reply({ content: "🔔 Notificando al usuario...", ephemeral: true });
+            await interaction.reply({ content: "🔔 Notificando al usuario...", ephemeral: true });
             return interaction.channel.send({ content: `⚠️ ¡Atención! <@${interaction.channel.topic}> el staff te está llamando.` });
         }
 
@@ -91,11 +95,13 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // --- MANEJADOR DE SUBMIT DE MODALS ---
     if (interaction.isModalSubmit()) {
         const { customId, guild, user, fields } = interaction;
 
-        // --- MANEJADOR DE TICKETS ---
+        // FORMULARIOS DE TICKETS
         if (customId.startsWith('modal_')) {
+            await interaction.deferReply({ ephemeral: true });
             let tipo = customId.replace('modal_', '');
             let categoriaID = "";
             let emoji = "🎫";
@@ -124,11 +130,11 @@ client.on('interactionCreate', async (interaction) => {
                 ],
             });
 
-            await interaction.reply({ content: `✅ Ticket creado: ${ticketChannel}`, ephemeral: true });
+            await interaction.editReply({ content: `✅ Ticket creado: ${ticketChannel}` });
 
             const embedInfo = new MessageEmbed()
                 .setTitle("Sistema De Tickets")
-                .setDescription("¡Bienvenido/a! Un miembro del staff te atenderá pronto.\nPor favor, espera pacientemente.")
+                .setDescription("¡Bienvenido/a! Un miembro del staff te atenderá pronto.")
                 .setColor("#2f3136")
                 .addFields(
                     { name: "👤 Usuario", value: `${user}`, inline: true },
@@ -141,8 +147,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setAuthor({ name: "📋 Respuestas del Formulario" })
                 .setColor("#000000")
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .setDescription(respuestas)
-                .setFooter({ text: `Ticket abierto por ${user.username}` });
+                .setDescription(respuestas);
 
             const rowBotones = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
@@ -153,8 +158,10 @@ client.on('interactionCreate', async (interaction) => {
             await ticketChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedInfo, embedRespuestas], components: [rowBotones] });
         }
 
-        // --- MANEJADOR DEL COMANDO /EMBED (CORREGIDO) ---
+        // --- CORRECCIÓN DEFINITIVA PARA /EMBED ---
         if (customId === 'modalanuncio') {
+            await interaction.deferReply({ ephemeral: true }); 
+
             try {
                 const titulo = fields.getTextInputValue("titulo");
                 const desc = fields.getTextInputValue("desc");
@@ -171,16 +178,15 @@ client.on('interactionCreate', async (interaction) => {
                     .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) });
 
                 if (titulo) embedanun.setTitle(titulo);
-                if (thumbnail && thumbnail.startsWith("http")) embedanun.setThumbnail(thumbnail);
-                if (banner && banner.startsWith("http")) embedanun.setImage(banner);
+                if (thumbnail && thumbnail.includes("http")) embedanun.setThumbnail(thumbnail);
+                if (banner && banner.includes("http")) embedanun.setImage(banner);
 
                 await interaction.channel.send({ embeds: [embedanun] });
-                
-                // Respuesta obligatoria para evitar el "No responde"
-                return await interaction.reply({ content: `✅ Embed enviado correctamente.`, ephemeral: true });
+                return await interaction.editReply({ content: `✅ Embed enviado correctamente.` });
+
             } catch (error) {
                 console.error(error);
-                if (!interaction.replied) return await interaction.reply({ content: `❌ Error al procesar el embed.`, ephemeral: true });
+                return await interaction.editReply({ content: `❌ Error al procesar el embed.` });
             }
         }
     }
