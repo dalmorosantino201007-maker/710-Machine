@@ -41,11 +41,9 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton()) {
         const { customId, guild, user, member } = interaction;
 
-        // --- BOTONES DE COPIAR ---
         if (customId === "copiar_cvu" || customId === "copiar_cvu22") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias" || customId === "copiar_alias22") return interaction.reply({ content: "710shop", ephemeral: true });
 
-        // --- DISPARADORES DE MODALS (TICKETS) ---
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             const producto = new TextInputComponent().setCustomId('p_prod').setLabel("¿Qué producto deseas comprar?").setStyle('SHORT').setPlaceholder('Ej: Reseller').setRequired(true);
@@ -70,7 +68,6 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.showModal(modal);
         }
 
-        // --- ACCIONES DENTRO DEL TICKET ---
         if (customId === "claim_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "Solo staff.", ephemeral: true });
             return interaction.reply({ embeds: [new MessageEmbed().setColor("GREEN").setDescription(`✅ El staff ${user} ha reclamado este ticket.`)] });
@@ -94,10 +91,10 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    // --- MANEJADOR DE ENVÍO DE FORMULARIOS (MODALS) ---
     if (interaction.isModalSubmit()) {
-        const { customId, guild, user } = interaction;
+        const { customId, guild, user, fields } = interaction;
 
+        // --- MANEJADOR DE TICKETS ---
         if (customId.startsWith('modal_')) {
             let tipo = customId.replace('modal_', '');
             let categoriaID = "";
@@ -106,13 +103,13 @@ client.on('interactionCreate', async (interaction) => {
 
             if (tipo === "compra") {
                 categoriaID = "1469945642909438114"; emoji = "🛒";
-                respuestas = `🛒 **Producto:**\n> ${interaction.fields.getTextInputValue('p_prod')}\n\n💳 **Método:**\n> ${interaction.fields.getTextInputValue('p_metodo')}\n\n📄 **Cantidad:**\n> ${interaction.fields.getTextInputValue('p_cant')}`;
+                respuestas = `🛒 **Producto:**\n> ${fields.getTextInputValue('p_prod')}\n\n💳 **Método:**\n> ${fields.getTextInputValue('p_metodo')}\n\n📄 **Cantidad:**\n> ${fields.getTextInputValue('p_cant')}`;
             } else if (tipo === "soporte") {
                 categoriaID = "1469621686155346042"; emoji = "🛠️";
-                respuestas = `🛠️ **Problema:**\n> ${interaction.fields.getTextInputValue('s_prob')}`;
+                respuestas = `🛠️ **Problema:**\n> ${fields.getTextInputValue('s_prob')}`;
             } else if (tipo === "partner") {
                 categoriaID = "1471010330229477528"; emoji = "🤝";
-                respuestas = `🔗 **Link:**\n> ${interaction.fields.getTextInputValue('pa_link')}\n\n📝 **Info:**\n> ${interaction.fields.getTextInputValue('pa_info') || 'No provista'}`;
+                respuestas = `🔗 **Link:**\n> ${fields.getTextInputValue('pa_link')}\n\n📝 **Info:**\n> ${fields.getTextInputValue('pa_info') || 'No provista'}`;
             }
 
             const channelName = `${emoji}-${tipo}-${user.username}`.toLowerCase().substring(0, 31);
@@ -129,7 +126,6 @@ client.on('interactionCreate', async (interaction) => {
 
             await interaction.reply({ content: `✅ Ticket creado: ${ticketChannel}`, ephemeral: true });
 
-            // --- DISEÑO DOBLE EMBED (SAYTUS/365 STYLE) ---
             const embedInfo = new MessageEmbed()
                 .setTitle("Sistema De Tickets")
                 .setDescription("¡Bienvenido/a! Un miembro del staff te atenderá pronto.\nPor favor, espera pacientemente.")
@@ -157,12 +153,35 @@ client.on('interactionCreate', async (interaction) => {
             await ticketChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedInfo, embedRespuestas], components: [rowBotones] });
         }
 
-        // Manejador del comando embed anterior
+        // --- MANEJADOR DEL COMANDO /EMBED (CORREGIDO) ---
         if (customId === 'modalanuncio') {
-            const desc = interaction.fields.getTextInputValue("desc");
-            const embedanun = new MessageEmbed().setDescription(desc).setColor("#000001").setTimestamp();
-            await interaction.channel.send({ embeds: [embedanun] });
-            await interaction.reply({ content: `✅ Embed enviado.`, ephemeral: true });
+            try {
+                const titulo = fields.getTextInputValue("titulo");
+                const desc = fields.getTextInputValue("desc");
+                const thumbnail = fields.getTextInputValue("thumbnail");
+                const banner = fields.getTextInputValue("banner");
+                let cor = fields.getTextInputValue("cor");
+
+                if (!/^#([0-9A-Fa-f]{3}){1,2}$/.test(cor)) cor = "#000001";
+
+                const embedanun = new MessageEmbed()
+                    .setDescription(desc)
+                    .setColor(cor)
+                    .setTimestamp()
+                    .setFooter({ text: guild.name, iconURL: guild.iconURL({ dynamic: true }) });
+
+                if (titulo) embedanun.setTitle(titulo);
+                if (thumbnail && thumbnail.startsWith("http")) embedanun.setThumbnail(thumbnail);
+                if (banner && banner.startsWith("http")) embedanun.setImage(banner);
+
+                await interaction.channel.send({ embeds: [embedanun] });
+                
+                // Respuesta obligatoria para evitar el "No responde"
+                return await interaction.reply({ content: `✅ Embed enviado correctamente.`, ephemeral: true });
+            } catch (error) {
+                console.error(error);
+                if (!interaction.replied) return await interaction.reply({ content: `❌ Error al procesar el embed.`, ephemeral: true });
+            }
         }
     }
 });
