@@ -25,11 +25,13 @@ const CATEGORIAS = {
     PARTNER: "1471010330229477528"  
 };
 
-// --- IMPORTAR BIENVENIDAS ---
-try {
-    require('./events/welcome')(client); 
-} catch (e) {
-    console.log("⚠️ No se pudo cargar welcome.js, revisa la ruta.");
+// --- IMPORTAR BIENVENIDAS (Ruta corregida a carpeta Events) ---
+const welcomePath = path.join(__dirname, 'Events', 'welcome.js');
+if (fs.existsSync(welcomePath)) {
+    require('./Events/welcome')(client);
+    console.log("✅ welcome.js cargado correctamente desde /Events/");
+} else {
+    console.log("⚠️ No se encontró welcome.js en ./Events/welcome.js (Revisa que la carpeta se llame Events)");
 }
 
 // --- FUNCIÓN PARA ENVIAR LOGS ---
@@ -180,7 +182,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ==========================================
-// 🔥 SISTEMA DE VIGILANCIA TOTAL (TODOS LOS LOGS) 🔥
+// 🔥 SISTEMA DE VIGILANCIA TOTAL 🔥
 // ==========================================
 
 client.on('messageCreate', m => {
@@ -231,8 +233,14 @@ client.on('voiceStateUpdate', (o, n) => {
 
 client.on('guildBanAdd', b => enviarLog(new MessageEmbed().setTitle("🔨 Usuario Baneado").setColor("#000000").setDescription(`**${b.user.tag}** fue baneado.`).setTimestamp()));
 
-client.on('ready', () => { 
+client.on('ready', async () => { 
     console.log(`🔥 ${client.user.username} - VIGILANCIA Y TICKETS ACTIVADOS`); 
+    
+    // MENSAJE DE INICIO EN EL CANAL DE LOGS
+    const canalLogs = client.channels.cache.get(canalLogsId);
+    if (canalLogs) {
+        canalLogs.send({ content: "710 Bot se ha iniciado correctamente 🔥" }).catch(e => console.error("Error al enviar log de inicio:", e));
+    }
 });
 
 client.login(process.env.TOKEN || config.token);
