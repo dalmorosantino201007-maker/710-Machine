@@ -37,7 +37,7 @@ module.exports = {
       .setThumbnail("https://cdn.discordapp.com/attachments/1474642509849165824/1474643351700766762/d62aq07xnbpa1.png?ex=699c9264&is=699b40e4&hm=8946ae50d874bac9d03f93773f5d5af6736d615726206e25c9eca7662501c600&")
       .setFooter(botName, botAvatar) // v13 usa (texto, icono)
       .setDescription(
-        `**•  __Producto__:** Steam Account\n\n` +
+        `**•  __Producto__:** CS2 Account\n\n` +
         `**•  Account(s):** ||${account}||\n` +
         `**•  Login:** [Haz Click Aqui](https://store.steampowered.com/login/)\n\n` +
         `Déjanos por favor una reseña para poder seguir creciendo!`
