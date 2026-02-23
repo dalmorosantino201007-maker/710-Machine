@@ -15,9 +15,9 @@ const client = new Client({
 client.slashCommands = new Collection();
 require('./handler')(client);
 
-// --- 🛠️ CONFIGURACIÓN DE IDs (Actualizadas) ---
+// --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
-const canalLogsId = "1473454832567320768"; 
+const canalLogsId = "1470928427199631412"; // <--- Nueva ID de Logs configurada aquí
 
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
@@ -47,6 +47,20 @@ client.on('interactionCreate', async (interaction) => {
 
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
+
+        // --- BOTÓN ASUMIR ---
+        if (customId === "asumir") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede asumir tickets.", ephemeral: true });
+            
+            await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
+            await channel.setName(`atendido-${user.username}`).catch(() => {});
+        }
+
+        // --- BOTÓN NOTIFICAR ---
+        if (customId === "notificar") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede usar esto.", ephemeral: true });
+            return interaction.reply({ content: `🔔 ${user} ha enviado una notificación de atención.` });
+        }
 
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
@@ -80,8 +94,6 @@ client.on('interactionCreate', async (interaction) => {
 
     // Modals
     if (interaction.isModalSubmit()) {
-        
-        // --- MODAL DE EMBED PERSONALIZADO ---
         if (interaction.customId === 'modalanuncio_v2') {
             await interaction.deferReply({ ephemeral: true });
             const titulo = interaction.fields.getTextInputValue('titulo');
@@ -103,7 +115,6 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.editReply({ content: "✅ Embed enviado correctamente." });
         }
 
-        // --- LÓGICA DE TICKETS ---
         await interaction.deferReply({ ephemeral: true });
         
         let cateId = "";
@@ -208,7 +219,7 @@ client.on('voiceStateUpdate', (o, n) => {
 // --- ENCENDIDO DEL BOT ---
 client.on('ready', () => { 
     console.log(`🔥 ${client.user.username} - SISTEMA PRO ACTIVADO`); 
-    const canalLogs = client.channels.cache.get(canalLogsId);"1470928427199631412"
+    const canalLogs = client.channels.cache.get(canalLogsId);
     if (canalLogs) {
         const embedOnline = new MessageEmbed()
             .setTitle("✅ Bot Online")

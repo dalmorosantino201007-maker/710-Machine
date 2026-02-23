@@ -6,7 +6,7 @@ module.exports = {
   description: "🔨 | Mensaje Feedback",
 
   run: async (client, interaction) => {
-    const requiredRoleId = "1475299077544480891";
+    const requiredRoleId = "1469967630365622403";
     const member = interaction.member;
 
     if (!member.roles.cache.has(requiredRoleId)) {
