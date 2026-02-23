@@ -17,7 +17,7 @@ require('./handler')(client);
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
-const canalLogsId = "1470928427199631412"; 
+const canalLogsId = "1473454832567320768"; 
 
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
@@ -31,7 +31,7 @@ const enviarLog = (embed) => {
     if (canal) canal.send({ embeds: [embed] }).catch(() => {});
 };
 
-// --- LÓGICA DE TICKETS (INTERACTIONS) ---
+// --- LÓGICA DE INTERACCIONES (TICKETS Y COMANDOS) ---
 client.on('interactionCreate', async (interaction) => {
     if (interaction.isCommand()) {
         const cmd = client.slashCommands.get(interaction.commandName);
@@ -40,13 +40,13 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.isButton()) {
-        const { customId, member, guild, user, channel } = interaction;
+        const { customId, member, user, channel } = interaction;
 
-        // Botones de pago rápido (CVU/Alias)
+        // Botones informativos
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
-        // Activación de Modals según el botón
+        // Modals de Tickets
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             const p = new TextInputComponent().setCustomId('p_prod').setLabel("Producto a comprar").setStyle('SHORT').setRequired(true);
@@ -69,6 +69,7 @@ client.on('interactionCreate', async (interaction) => {
             return await interaction.showModal(modal);
         }
 
+        // Cerrar Ticket
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede cerrar tickets.", ephemeral: true });
             enviarLog(new MessageEmbed().setTitle("🔒 Ticket Cerrado").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel.name}`).setColor("ORANGE").setTimestamp());
@@ -77,7 +78,32 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // --- MANEJO DE ENVÍO DE MODALS (TICKETS Y EMBEDS) ---
     if (interaction.isModalSubmit()) {
+        
+        // 1. Lógica del Comando /embed
+        if (interaction.customId === 'modalanuncio_v2') {
+            await interaction.deferReply({ ephemeral: true });
+            const titulo = interaction.fields.getTextInputValue('titulo');
+            const desc = interaction.fields.getTextInputValue('desc');
+            const thumb = interaction.fields.getTextInputValue('thumbnail');
+            const banner = interaction.fields.getTextInputValue('banner');
+            const color = interaction.fields.getTextInputValue('cor') || "#5865F2";
+
+            const embedCustom = new MessageEmbed()
+                .setTitle(titulo || "")
+                .setDescription(desc)
+                .setColor(color.startsWith('#') ? color : `#${color}`)
+                .setTimestamp();
+
+            if (thumb && thumb.startsWith('http')) embedCustom.setThumbnail(thumb);
+            if (banner && banner.startsWith('http')) embedCustom.setImage(banner);
+
+            await interaction.channel.send({ embeds: [embedCustom] });
+            return interaction.editReply({ content: "✅ Embed enviado con éxito." });
+        }
+
+        // 2. Lógica de Creación de Tickets
         await interaction.deferReply({ ephemeral: true });
         
         let cateId = "";
@@ -85,7 +111,6 @@ client.on('interactionCreate', async (interaction) => {
         let nombreCanal = "";
         let camposInfo = [];
 
-        // Configuración según el modal enviado
         if (interaction.customId === 'modal_compra') {
             cateId = CATEGORIAS.COMPRA;
             tipoTicket = "Compras";
@@ -124,7 +149,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setAuthor({ name: client.user.username, iconURL: client.user.displayAvatarURL() })
                 .setTitle("SISTEMA DE TICKETS")
                 .setColor("#5865F2")
-                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
+                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.`)
                 .addFields(
                     { name: "Categoría", value: tipoTicket, inline: true },
                     { name: "ID del Ticket", value: `\`${ticketID}\``, inline: true },
@@ -148,43 +173,25 @@ client.on('interactionCreate', async (interaction) => {
 
         } catch (e) {
             console.error(e);
-            await interaction.editReply({ content: "❌ Error al crear el canal. Revisa los permisos." });
+            await interaction.editReply({ content: "❌ Error al crear el canal. Revisa los permisos del bot." });
         }
     }
 });
 
 // --- 🕵️‍♂️ SISTEMA DE LOGS TOTALES ---
 
-client.on('messageCreate', m => {
-    if (m.author.bot) return;
-    enviarLog(new MessageEmbed().setAuthor({name: `💬 Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL()}).setDescription(`**Canal:** ${m.channel}\n**Contenido:** ${m.content || "Imagen/Archivo"}`).setColor("BLUE").setTimestamp());
-});
-
 client.on('messageDelete', m => {
-    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("RED").addField("Autor", `${m.author?.tag || "Unknown"}`, true).addField("Canal", `${m.channel}`, true).addField("Contenido", `\`\`\`${m.content || "Sin texto"}\`\`\``).setTimestamp());
+    if (!m.guild || m.author?.bot) return;
+    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("RED").addField("Autor", `${m.author?.tag || "Unknown"}`, true).addField("Canal", `${m.channel}`, true).addField("Contenido", `\`\`\`${m.content || "Sin texto/Imagen"}\`\`\``).setTimestamp());
 });
 
 client.on('messageUpdate', (o, n) => {
-    if (o.content === n.content) return;
+    if (o.author?.bot || o.content === n.content) return;
     enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("YELLOW").addField("Autor", `${o.author.tag}`, true).addField("Antes", `\`\`\`${o.content}\`\`\``).addField("Después", `\`\`\`${n.content}\`\`\``).setTimestamp());
-});
-
-client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("GREEN").setDescription(`Nombre: **${c.name}**\nTipo: ${c.type}`).setTimestamp()));
-client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🚫 Canal Borrado").setColor("DARK_RED").setDescription(`Nombre: **${c.name}**`).setTimestamp()));
-client.on('channelUpdate', (o, n) => {
-    if (o.name !== n.name) enviarLog(new MessageEmbed().setTitle("📝 Canal Renombrado").setColor("PURPLE").setDescription(`Antes: ${o.name}\nDespués: ${n.name}`).setTimestamp());
 });
 
 client.on('guildMemberAdd', m => enviarLog(new MessageEmbed().setTitle("📥 Miembro Nuevo").setColor("GREEN").setDescription(`**${m.user.tag}** se unió al servidor.`).setThumbnail(m.user.displayAvatarURL()).setTimestamp()));
 client.on('guildMemberRemove', m => enviarLog(new MessageEmbed().setTitle("📤 Miembro Salió").setColor("RED").setDescription(`**${m.user.tag}** abandonó el servidor.`).setTimestamp()));
-
-client.on('guildMemberUpdate', (o, n) => {
-    if (o.roles.cache.size !== n.roles.cache.size) {
-        const role = n.roles.cache.filter(r => !o.roles.cache.has(r.id)).first() || o.roles.cache.filter(r => !n.roles.cache.has(r.id)).first();
-        const action = n.roles.cache.size > o.roles.cache.size ? "Añadido" : "Quitado";
-        enviarLog(new MessageEmbed().setTitle("🛡️ Cambio de Rol").setColor("GREY").setDescription(`**Usuario:** ${n.user.tag}\n**Rol:** ${role?.name || "Desconocido"}\n**Acción:** ${action}`).setTimestamp());
-    }
-});
 
 client.on('voiceStateUpdate', (o, n) => {
     let e = new MessageEmbed().setColor("AQUA").setTimestamp();
@@ -193,11 +200,11 @@ client.on('voiceStateUpdate', (o, n) => {
     else if (o.channelId !== n.channelId) enviarLog(e.setTitle("🔄 Voz: Cambio de Sala").setDescription(`${n.member.user.tag} se movió de ${o.channel.name} a ${n.channel.name}`));
 });
 
+// --- ENCENDIDO DEL BOT ---
 client.on('ready', () => { 
     console.log(`🔥 ${client.user.username} - SISTEMA PRO ACTIVADO`); 
 
-    // Aviso automático en el canal de logs al encenderse
-    const canalLogs = client.channels.cache.get(canalLogsId);"1470928427199631412"
+    const canalLogs = client.channels.cache.get(canalLogsId);
     if (canalLogs) {
         const embedOnline = new MessageEmbed()
             .setTitle("✅ Bot Online")
