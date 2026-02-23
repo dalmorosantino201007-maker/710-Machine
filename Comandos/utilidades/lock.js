@@ -14,7 +14,7 @@ module.exports = {
     }
 
     const canal = interaction.channel;
-    const rolBloqueado = "1469619306886205574"; // ID del rol
+    const rolBloqueado = "1475299070863085728"; // ID del rol
 
     try {
       // Bloquear visibilidad para @everyone

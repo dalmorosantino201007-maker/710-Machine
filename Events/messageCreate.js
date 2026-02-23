@@ -23,7 +23,7 @@ module.exports = (client) => {
     }
 
     // --- 2. VERIFICACIÓN DE ROL DEL STAFF ---
-    const requiredRoleId = '1469967630365622403';
+    const requiredRoleId = '1475299077544480891';
     const hasRole = message.member.roles.cache.has(requiredRoleId);
 
     // --- 3. MENCIÓN AL BOT ---

@@ -7,7 +7,7 @@ module.exports = {
 
   run: async (client, interaction) => {
     // ID del rol requerido
-    const requiredRoleId = "1469618981781373042";
+    const requiredRoleId = "1475299082250489968";
 
     // Verificar si el usuario tiene el rol
     const member = interaction.member;
@@ -35,7 +35,7 @@ module.exports = {
         `Tu transacción ha sido registrada y tu pedido está en curso.\n\n` +
 
         `**🚚 Entrega en proceso**\n` +
-        `> Un miembro de nuestro equipo <@&1469967630365622403> se encargará de entregarte tu producto en breve.\n` +
+        `> Un miembro de nuestro equipo <@&1475299077544480891> se encargará de entregarte tu producto en breve.\n` +
         `> **Por favor, evita mencionar al staff innecesariamente mientras se gestiona tu entrega.**\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -48,7 +48,7 @@ module.exports = {
         `Your transaction has been received and your order is being processed.\n\n` +
 
         `**🚚 Delivery in progress**\n` +
-        `> A staff member <@&1469967630365622403> will handle the delivery shortly.\n` +
+        `> A staff member <@&1475299077544480891> will handle the delivery shortly.\n` +
         `> **Please avoid tagging staff unnecessarily while your order is being fulfilled.**\n\n` +
 
         `**🛠️ Support**\n` +

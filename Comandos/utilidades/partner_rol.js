@@ -11,7 +11,7 @@ module.exports = {
       return interaction.reply({ content: `No tienes permiso para utilizar este comando.`, ephemeral: true });
     }
 
-    const rolId = "1368948532295368764"; // ID del rol
+    const rolId = "1475299059907690648"; // ID del rol
     const cargo = interaction.guild.roles.cache.get(rolId);
 
     // Enviar un mensaje efímero que será visible solo para el usuario
