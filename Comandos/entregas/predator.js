@@ -15,7 +15,7 @@ module.exports = {
 
   run: async (client, interaction) => {
     // ID del rol requerido (Limpiado para evitar errores de sintaxis)
-    const requiredRoleId = "1469968666425823274";
+    const requiredRoleId = "1475299082250489968";
 
     // Verificar si el usuario tiene el rol
     if (!interaction.member.roles.cache.has(requiredRoleId)) {

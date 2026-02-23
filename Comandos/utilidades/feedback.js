@@ -6,7 +6,7 @@ module.exports = {
   description: "🔨 | Mensaje Feedback",
 
   run: async (client, interaction) => {
-    const requiredRoleId = "1469967630365622403";
+    const requiredRoleId = "1475299077544480891";
     const member = interaction.member;
 
     if (!member.roles.cache.has(requiredRoleId)) {
@@ -20,7 +20,7 @@ module.exports = {
     const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const guildIcon = interaction.guild.iconURL({ dynamic: true });
 
-    const feedbackChannelId = "1470869238397931645";
+    const feedbackChannelId = "1475299529908682822";
     const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
 
     // Cambiado a MessageEmbed (v13)
@@ -33,7 +33,7 @@ module.exports = {
         `Tu compra ha sido completada correctamente.\n\n` +
 
         `**💬 Deja tu opinión**\n` +
-        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1470869238397931645>.\n` +
+        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1475299529908682822>.\n` +
         `> Tu opinión nos ayuda a seguir mejorando nuestros servicios.\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -45,7 +45,7 @@ module.exports = {
         `Your purchase has been successfully processed.\n\n` +
 
         `**💬 Leave your feedback**\n` +
-        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1470869238397931645>.\n` +
+        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1475299529908682822>.\n` +
         `> Your feedback helps us grow and improve.\n\n` +
 
         `**🛠️ Support**\n` +

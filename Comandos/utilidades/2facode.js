@@ -8,7 +8,7 @@ module.exports = {
 
   run: async (client, interaction) => {
     // Nota: Eliminé la "v" al final del ID que tenías en el original por si era un error de dedo
-    const allowedRoleId = "1469618981781373042"; 
+    const allowedRoleId = "1475298982887559188"; 
 
     if (!interaction.member.roles.cache.has(allowedRoleId)) {
       return interaction.reply({
