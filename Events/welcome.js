@@ -24,13 +24,13 @@ module.exports = (client) => {
         { name: '🕒 Se unió al servidor el:', value: `<t:${Math.floor(Date.now() / 1000)}:F>`, inline: false },
         { name: '⏳ Miembro desde hace:', value: `${Math.floor((Date.now() - member.user.createdTimestamp) / (1000 * 60 * 60 * 24))} días`, inline: false },
         { name: '👥 Total de miembros:', value: `${guild.memberCount}`, inline: false },
-        { name: '📖 Términos del servidor:', value: `Asegúrate de revisar nuestras términos en <#1475299469141475368>` }
+        { name: '📖 Términos del servidor:', value: `Asegúrate de revisar nuestras términos en <#1469950357785546853>` }
       )
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 1024 }))
       .setFooter(`¡Ahora somos ${guild.memberCount} miembros!`, guild.iconURL({ dynamic: true }))
       .setTimestamp();
 
-    const welcomeChannel = client.channels.cache.get("1475299459091927161");
+    const welcomeChannel = client.channels.cache.get("1469953972197654570");
     if (welcomeChannel) {
       await welcomeChannel.send({
         content: `👋 ¡Bienvenido/a ${member}! Esperamos que disfrutes tu estadía en **${guild.name}™**.`,

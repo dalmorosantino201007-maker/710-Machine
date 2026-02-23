@@ -16,13 +16,13 @@ client.slashCommands = new Collection();
 require('./handler')(client);
 
 // --- 🛠️ CONFIGURACIÓN DE IDs (Actualizadas) ---
-const rolPermitidoId = "1475299077544480891"; 
-const canalLogsId = "1475299346873323673"; 
+const rolPermitidoId = "1469967630365622403"; 
+const canalLogsId = "1473454832567320768"; 
 
 const CATEGORIAS = {
-    COMPRA: "1475299296659243018",  
-    SOPORTE: "1475299280553115791", 
-    PARTNER: "1475299307102929159"  
+    COMPRA: "1469945642909438114",  
+    SOPORTE: "1469621686155346042", 
+    PARTNER: "1471010330229477528"  
 };
 
 // --- FUNCIÓN PARA ENVIAR LOGS ---
@@ -208,7 +208,7 @@ client.on('voiceStateUpdate', (o, n) => {
 // --- ENCENDIDO DEL BOT ---
 client.on('ready', () => { 
     console.log(`🔥 ${client.user.username} - SISTEMA PRO ACTIVADO`); 
-    const canalLogs = client.channels.cache.get(canalLogsId);
+    const canalLogs = client.channels.cache.get(canalLogsId);"1470928427199631412"
     if (canalLogs) {
         const embedOnline = new MessageEmbed()
             .setTitle("✅ Bot Online")

@@ -15,7 +15,7 @@ module.exports = (client) => {
             if (!wasBooster && isBooster) {
                 const guild = newMember.guild;
                 // ID del canal de boosts
-                const boostChannel = await guild.channels.cache.get('1475299508731773102');
+                const boostChannel = await guild.channels.cache.get('1469948899245686836');
 
                 if (!boostChannel) {
                     console.warn('Canal de boost no encontrado o no está en caché.');
@@ -35,7 +35,7 @@ module.exports = (client) => {
                     new MessageButton()
                         .setLabel('Reclamar Recompensas')
                         .setStyle('LINK') // En v13 se usa string en mayúsculas
-                        .setURL('https://discord.com/channels/1475268485407047770/1475300172631376118')
+                        .setURL('https://discord.com/channels/1469618754282586154/1469861946135416872')
                 );
 
                 // Enviar mensaje al canal

@@ -37,7 +37,7 @@ module.exports = {
     const comprador = interaction.options.getUser("comprador");
 
     // Buscamos el canal en la config
-    const canalPagos = interaction.guild.channels.cache.get(config.canal_pagos);
+    const canalPagos = interaction.guild.channels.cache.get(config.canal_pagos);"1469970757428973568"
     if (!canalPagos) {
       return interaction.reply({ content: "❌ El canal de pagos no está configurado correctamente en config.json.", ephemeral: true });
     }

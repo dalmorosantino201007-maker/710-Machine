@@ -25,8 +25,8 @@ module.exports = {
   ],
 
   run: async (client, interaction) => {
-    const rolPermitido = "1475299096112795825"; 
-    const canalLogsID = "1475299341366460426"; 
+    const rolPermitido = "1469967630365622403"; 
+    const canalLogsID = "1471003008622919896"; 
 
     if (!interaction.member.roles.cache.has(rolPermitido)) {
       return interaction.reply({

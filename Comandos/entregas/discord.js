@@ -15,7 +15,7 @@ module.exports = {
 
   run: async (client, interaction) => {
     // Definimos el ID del rol de ventas directamente o desde config
-    const requiredRoleId = "1475299082250489968"; 
+    const requiredRoleId = "1469967630365622403"; 
 
     // Verificar si el usuario tiene el rol
     if (!interaction.member.roles.cache.has(requiredRoleId)) {

@@ -38,7 +38,7 @@ module.exports = {
     const comentario = interaction.options.getString("comentario");
     const linkImagen = interaction.options.getString("url_imagen");
 
-    const canalId = config.canal_proofs || "1475299524858876056";
+    const canalId = config.canal_proofs || "1469619944676135033";
     const canalLog = interaction.guild.channels.cache.get(canalId);
 
     if (!canalLog) return interaction.reply({ content: "❌ Canal no encontrado.", ephemeral: true });

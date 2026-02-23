@@ -18,7 +18,7 @@ module.exports = {
     const user = interaction.user;
     const guild = interaction.guild;
 
-    const suggestionChannelId = "1475299546270798007"; 
+    const suggestionChannelId = "1469948677299634260"; 
     const channel = client.channels.cache.get(suggestionChannelId);
 
     // En v13 el tipo se verifica con el string 'GUILD_TEXT'
