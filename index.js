@@ -13,71 +13,95 @@ const client = new Client({
 });
 
 client.slashCommands = new Collection();
-
-// Carga del Handler
 require('./handler')(client);
 
-// Configuración de IDs (Asegúrate de que sean correctos)
+// --- CONFIGURACIÓN DE IDs DE CATEGORÍAS ---
 const rolPermitidoId = "1469967630365622403"; 
-const categoriaTickets = "1469950823474659409"; // Coloca aquí el ID de la categoría donde quieres que se creen
+
+const CATEGORIAS = {
+    COMPRA: "1469945642909438114",  // ID Categoría de Compras
+    SOPORTE: "1469621686155346042", // Pone el ID real acá
+    PARTNER: "1471010330229477528"  // Pone el ID real acá
+};
 
 client.on('interactionCreate', async (interaction) => {
     
-    // Ejecución de Slash Commands
     if (interaction.isCommand()) {
         const cmd = client.slashCommands.get(interaction.commandName);
-        if (!cmd) return;
-        try { 
-            await cmd.run(client, interaction); 
-        } catch (e) { 
-            console.error(e); 
-            if (!interaction.replied) interaction.reply({ content: "Error al ejecutar el comando.", ephemeral: true });
-        }
+        if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
     }
 
-    // Manejo de Botones
+    // --- MANEJO DE LOS 3 BOTONES ---
     if (interaction.isButton()) {
-        const { customId, guild, user, member } = interaction;
+        const { customId, member } = interaction;
 
-        // Botones de pago rápido
-        if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
-        if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
-
-        // Trigger del Modal de Compra
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
-            const p = new TextInputComponent().setCustomId('p_prod').setLabel("¿Qué producto deseas comprar?").setStyle('SHORT').setRequired(true);
+            const p = new TextInputComponent().setCustomId('p_prod').setLabel("¿Qué producto deseas?").setStyle('SHORT').setRequired(true);
             const m = new TextInputComponent().setCustomId('p_metodo').setLabel("Método (ARS, USD, Crypto)").setStyle('SHORT').setRequired(true);
             const c = new TextInputComponent().setCustomId('p_cant').setLabel("Cantidad").setStyle('SHORT').setRequired(true).setValue("1");
-            
-            modal.addComponents(
-                new MessageActionRow().addComponents(p), 
-                new MessageActionRow().addComponents(m), 
-                new MessageActionRow().addComponents(c)
-            );
+            modal.addComponents(new MessageActionRow().addComponents(p), new MessageActionRow().addComponents(m), new MessageActionRow().addComponents(c));
             return await interaction.showModal(modal);
         }
 
-        // Botón para cerrar ticket
+        if (customId === "ticket_soporte") {
+            const modal = new Modal().setCustomId('modal_soporte').setTitle('Centro de Soporte');
+            const p = new TextInputComponent().setCustomId('p_duda').setLabel("Describe tu problema").setStyle('PARAGRAPH').setRequired(true);
+            modal.addComponents(new MessageActionRow().addComponents(p));
+            return await interaction.showModal(modal);
+        }
+
+        if (customId === "ticket_partner") {
+            const modal = new Modal().setCustomId('modal_partner').setTitle('Solicitud de Partner');
+            const p = new TextInputComponent().setCustomId('p_propuesta').setLabel("Tu propuesta o canal de YT/Twitch").setStyle('PARAGRAPH').setRequired(true);
+            modal.addComponents(new MessageActionRow().addComponents(p));
+            return await interaction.showModal(modal);
+        }
+
         if (customId === "fechar_ticket") {
-            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el staff puede cerrar este ticket.", ephemeral: true });
-            await interaction.reply("🔒 Cerrando ticket en 3 segundos...");
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "Solo Staff.", ephemeral: true });
+            await interaction.reply("🔒 Cerrando en 3 segundos...");
             setTimeout(() => interaction.channel.delete().catch(() => {}), 3000);
         }
     }
 
-    // Manejo del Envío del Modal
+    // --- MANEJO DE LOS FORMULARIOS (SUBMIT) ---
     if (interaction.isModalSubmit()) {
-        if (interaction.customId === 'modal_compra') {
-            const producto = interaction.fields.getTextInputValue('p_prod');
-            const metodo = interaction.fields.getTextInputValue('p_metodo');
-            const cantidad = interaction.fields.getTextInputValue('p_cant');
+        // Esto evita el error de "Algo ha fallado" dando tiempo al bot
+        await interaction.deferReply({ ephemeral: true });
 
-            // Crear canal de ticket
-            const canal = await interaction.guild.channels.create(`compra-${interaction.user.username}`, {
+        let cateId = "";
+        let nombreTicket = "";
+        let embedColor = "#2f3136";
+        let campos = [];
+
+        // Definimos qué datos usar según el formulario
+        if (interaction.customId === 'modal_compra') {
+            cateId = CATEGORIAS.COMPRA;
+            nombreTicket = `🛒-compra-${interaction.user.username}`;
+            embedColor = "#00FF00";
+            campos = [
+                { name: "📦 Producto", value: interaction.fields.getTextInputValue('p_prod'), inline: true },
+                { name: "💳 Método", value: interaction.fields.getTextInputValue('p_metodo'), inline: true },
+                { name: "🔢 Cantidad", value: interaction.fields.getTextInputValue('p_cant'), inline: true }
+            ];
+        } else if (interaction.customId === 'modal_soporte') {
+            cateId = CATEGORIAS.SOPORTE;
+            nombreTicket = `🛠️-soporte-${interaction.user.username}`;
+            embedColor = "#FFFF00";
+            campos = [{ name: "❓ Problema", value: interaction.fields.getTextInputValue('p_duda') }];
+        } else if (interaction.customId === 'modal_partner') {
+            cateId = CATEGORIAS.PARTNER;
+            nombreTicket = `🤝-partner-${interaction.user.username}`;
+            embedColor = "#00AAFF";
+            campos = [{ name: "📝 Propuesta", value: interaction.fields.getTextInputValue('p_propuesta') }];
+        }
+
+        try {
+            const canal = await interaction.guild.channels.create(nombreTicket, {
                 type: 'GUILD_TEXT',
-                parent: categoriaTickets,
+                parent: cateId,
                 permissionOverwrites: [
                     { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
                     { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
@@ -85,27 +109,25 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            const embedBienvenida = new MessageEmbed()
-                .setTitle("🛒 Nuevo Pedido de Compra")
-                .setColor("#2f3136")
-                .setDescription(`Bienvenido ${interaction.user}, el Staff te atenderá en breve.\n\n**Detalles del pedido:**`)
-                .addFields(
-                    { name: "📦 Producto", value: producto, inline: true },
-                    { name: "💳 Método", value: metodo, inline: true },
-                    { name: "🔢 Cantidad", value: cantidad, inline: true }
-                )
-                .setFooter({ text: "Presiona el botón rojo para cerrar el ticket." })
+            const embed = new MessageEmbed()
+                .setTitle("NUEVO TICKET ABIERTO")
+                .setColor(embedColor)
+                .addFields(campos)
+                .setFooter({ text: `Usuario: ${interaction.user.tag}` })
                 .setTimestamp();
 
-            const filaCerrar = new MessageActionRow().addComponents(
+            const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar Ticket").setStyle("DANGER").setEmoji("🔒")
             );
 
-            await canal.send({ content: `<@&${rolPermitidoId}> | ${interaction.user}`, embeds: [embedBienvenida], components: [filaCerrar] });
-            await interaction.reply({ content: `✅ Ticket creado correctamente en ${canal}`, ephemeral: true });
+            await canal.send({ content: `<@&${rolPermitidoId}> | ${interaction.user}`, embeds: [embed], components: [row] });
+            await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
+
+        } catch (e) {
+            console.error(e);
+            await interaction.editReply({ content: "❌ Error: Revisa si los IDs de las categorías están bien puestos." });
         }
     }
 });
 
-client.on('ready', () => { console.log(`🔥 ${client.user.username} listo para vender!`); });
 client.login(process.env.TOKEN || config.token);
