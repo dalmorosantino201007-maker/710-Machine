@@ -27,10 +27,16 @@ module.exports = (client) => {
         { name: '📖 Términos del servidor:', value: `Asegúrate de revisar nuestras términos en <#1469950357785546853>` }
       )
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 1024 }))
-      .setFooter(`¡Ahora somos ${guild.memberCount} miembros!`, guild.iconURL({ dynamic: true }))
+      .setFooter({ text: `¡Ahora somos ${guild.memberCount} miembros!`, iconURL: guild.iconURL({ dynamic: true }) }) // Fix: Formato objeto
       .setTimestamp();
 
-    const welcomeChannel = client.channels.cache.get("1469953972197654570");
+    // Fix: Si el canal no está en cache, lo buscamos (fetch)
+    const channelId = "1469953972197654570";
+    let welcomeChannel = client.channels.cache.get(channelId);
+    if (!welcomeChannel) {
+        welcomeChannel = await client.channels.fetch(channelId).catch(() => null);
+    }
+
     if (welcomeChannel) {
       await welcomeChannel.send({
         content: `👋 ¡Bienvenido/a ${member}! Esperamos que disfrutes tu estadía en **${guild.name}™**.`,
@@ -44,21 +50,20 @@ module.exports = (client) => {
       .setTitle(`¡Bienvenido/a a ${guild.name}!`)
       .setDescription(`¡Hola ${member}! Estamos encantados de tenerte en **${guild.name}**. :wave:\n\n:mag: ¡**Atención**! Para asegurar una experiencia fluida, visita:\n\n:one: **Información Importante**: [Haz clic aquí](https://discord.com/channels/1469618754282586154/1469950357785546853)\n:two: **Comunidad y Confianza**: [Haz clic aquí](https://discord.com/channels/1469618754282586154/1469950357785546853)\n\n:pushpin: **Características**:\n- Soporte 24/7 disponible :tools:`)
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 1024 }))
-      .setFooter(`Bienvenid@ a ${guild.name}`, guild.iconURL({ dynamic: true }))
+      .setFooter({ text: `Bienvenid@ a ${guild.name}`, iconURL: guild.iconURL({ dynamic: true }) }) // Fix: Formato objeto
       .setTimestamp();
 
-    // Botones con estilo v13
     const buttonRow = new MessageActionRow().addComponents(
       new MessageButton()
         .setLabel('Discord del Developer')
         .setStyle('LINK')
         .setURL('https://discord.gg/r6yP9CPKSt')
-        .setEmoji(guild.emojis.cache.find(e => e.name === 'discord')?.id || '🚀'),
+        .setEmoji('🚀'), // Simplificado para evitar errores si el emoji no carga
       new MessageButton()
         .setLabel('Youtube de Host')
         .setStyle('LINK')
         .setURL('https://www.youtube.com/@HostStore1')
-        .setEmoji(guild.emojis.cache.find(e => e.name === 'youtube')?.id || '📺')
+        .setEmoji('📺') // Simplificado
     );
 
     await member.send({ embeds: [dmEmbed], components: [buttonRow] }).catch(() => {
