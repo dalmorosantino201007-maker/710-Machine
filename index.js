@@ -56,7 +56,7 @@ client.on('interactionCreate', async (interaction) => {
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
-        // --- BOTONES DE GESTIÓN DE TICKET ---
+        // GESTIÓN DE TICKETS
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
             await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
@@ -76,7 +76,7 @@ client.on('interactionCreate', async (interaction) => {
             setTimeout(() => channel.delete().catch(() => {}), 3000);
         }
 
-        // --- APERTURA DE MODALES CON TUS PREGUNTAS ---
+        // APERTURA DE MODALES CON LAS NUEVAS PREGUNTAS
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
@@ -106,13 +106,13 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isModalSubmit()) {
         await interaction.deferReply({ ephemeral: true });
         
-        let cateId, tipoTicket, nombreCanal, camposEmbed = [];
+        let cateId, tipoTicket, nombreCanal, camposPersonalizados = [];
 
         if (interaction.customId === 'modal_compra') {
             cateId = CATEGORIAS.COMPRA;
             tipoTicket = "Compras";
             nombreCanal = `🛒-compra-${interaction.user.username}`;
-            camposEmbed = [
+            camposPersonalizados = [
                 { name: "📦 Producto", value: interaction.fields.getTextInputValue('p_prod'), inline: true },
                 { name: "💳 Método", value: interaction.fields.getTextInputValue('p_metodo'), inline: true },
                 { name: "🔢 Cantidad", value: interaction.fields.getTextInputValue('p_cant'), inline: true }
@@ -121,14 +121,14 @@ client.on('interactionCreate', async (interaction) => {
             cateId = CATEGORIAS.SOPORTE;
             tipoTicket = "Soporte";
             nombreCanal = `🛠️-soporte-${interaction.user.username}`;
-            camposEmbed = [{ name: "❓ Ayuda", value: interaction.fields.getTextInputValue('p_duda') }];
+            camposPersonalizados = [{ name: "❓ Ayuda", value: interaction.fields.getTextInputValue('p_duda') }];
         } else if (interaction.customId === 'modal_partner') {
             cateId = CATEGORIAS.PARTNER;
             tipoTicket = "Partner";
             nombreCanal = `🤝-partner-${interaction.user.username}`;
-            camposEmbed = [
+            camposPersonalizados = [
                 { name: "✅ Add añadido", value: interaction.fields.getTextInputValue('p_add'), inline: true },
-                { name: "🔗 Link", value: interaction.fields.getTextInputValue('p_link'), inline: true }
+                { name: "🔗 Link del Server", value: interaction.fields.getTextInputValue('p_link'), inline: true }
             ];
         }
 
@@ -143,20 +143,22 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            const ticketID = Math.floor(Math.random() * 900000) + 100000;
+            const ticketID = Math.floor(Math.random() * 90000000000000) + 10000000000000;
+            const fecha = moment().format('dddd, D [de] MMMM [de] YYYY HH:mm');
+
             const embedTicket = new MessageEmbed()
                 .setTitle("SISTEMA DE TICKETS")
-                .setColor("#5865F2")
+                .setColor("#2f3136")
                 .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.`)
                 .addFields(
                     { name: "Categoría", value: tipoTicket, inline: true },
                     { name: "ID del Ticket", value: `\`${ticketID}\``, inline: true },
-                    { name: "ID del Usuario", value: `\`${interaction.user.id}\``, inline: true }
+                    { name: "Fecha", value: `\`${fecha}\``, inline: true },
+                    { name: "Usuario", value: `${interaction.user.tag} (${interaction.user.id})` }
                 )
-                .addFields(camposEmbed)
+                .addFields(camposPersonalizados)
                 .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-                .setFooter({ text: "710 Shop - Gestión de Tickets" })
-                .setTimestamp();
+                .setFooter({ text: "710 Shop - Gestión de Tickets" });
 
             const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
@@ -177,7 +179,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ==========================================
-// 🔥 SISTEMA DE VIGILANCIA TOTAL (LOGS) 🔥
+// 🔥 SISTEMA DE VIGILANCIA TOTAL (TODOS LOS LOGS) 🔥
 // ==========================================
 
 client.on('messageCreate', m => {
@@ -196,23 +198,26 @@ client.on('messageUpdate', (o, n) => {
 });
 
 client.on('guildMemberAdd', m => {
-    enviarLog(new MessageEmbed().setTitle("📥 Miembro Nuevo").setColor("#00ff00").setDescription(`**${m.user.tag}** se unió.`).setTimestamp());
+    enviarLog(new MessageEmbed().setTitle("📥 Miembro Nuevo").setColor("#00ff00").setDescription(`**${m.user.tag}** entró al servidor.`).setTimestamp());
 });
 
 client.on('guildMemberRemove', m => {
-    enviarLog(new MessageEmbed().setTitle("📤 Miembro Salió").setColor("#ff4500").setDescription(`**${m.user.tag}** salió.`).setTimestamp());
+    enviarLog(new MessageEmbed().setTitle("📤 Miembro Salió").setColor("#ff4500").setDescription(`**${m.user.tag}** abandonó el servidor.`).setTimestamp());
 });
 
 client.on('guildMemberUpdate', (o, n) => {
     const oR = o.roles.cache, nR = n.roles.cache;
     if (oR.size < nR.size) {
         const role = nR.filter(r => !oR.has(r.id)).first();
-        enviarLog(new MessageEmbed().setTitle("➕ Rol Añadido").setColor("#2ecc71").setDescription(`A **${n.user.tag}** se le dio ${role}`).setTimestamp());
+        enviarLog(new MessageEmbed().setTitle("➕ Rol Añadido").setColor("#2ecc71").setDescription(`A **${n.user.tag}** se le asignó el rol ${role}`).setTimestamp());
     } else if (oR.size > nR.size) {
         const role = oR.filter(r => !nR.has(r.id)).first();
-        enviarLog(new MessageEmbed().setTitle("➖ Rol Quitado").setColor("#e74c3c").setDescription(`A **${n.user.tag}** se le quitó ${role}`).setTimestamp());
+        enviarLog(new MessageEmbed().setTitle("➖ Rol Quitado").setColor("#e74c3c").setDescription(`A **${n.user.tag}** se le quitó el rol ${role}`).setTimestamp());
     }
 });
+
+client.on('roleCreate', r => enviarLog(new MessageEmbed().setTitle("🆕 Rol Creado").setColor("#3498db").setDescription(`Nombre: ${r.name}`).setTimestamp()));
+client.on('roleDelete', r => enviarLog(new MessageEmbed().setTitle("🗑️ Rol Eliminado").setColor("#c0392b").setDescription(`Nombre: ${r.name}`).setTimestamp()));
 
 client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("#1abc9c").setDescription(`Canal: ${c.name}`).setTimestamp()));
 client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🗑️ Canal Borrado").setColor("#e67e22").setDescription(`Nombre: ${c.name}`).setTimestamp()));
@@ -223,8 +228,10 @@ client.on('voiceStateUpdate', (o, n) => {
     else if (o.channelId && !n.channelId) enviarLog(e.setTitle("🔇 Voz: Desconexión").setDescription(`${o.member.user.tag} salió de ${o.channel.name}`));
 });
 
+client.on('guildBanAdd', b => enviarLog(new MessageEmbed().setTitle("🔨 Usuario Baneado").setColor("#000000").setDescription(`**${b.user.tag}** fue baneado.`).setTimestamp()));
+
 client.on('ready', () => { 
-    console.log(`🔥 ${client.user.username} - SISTEMA PRO ACTIVADO`); 
+    console.log(`🔥 ${client.user.username} - VIGILANCIA Y TICKETS ACTIVADOS`); 
 });
 
 client.login(process.env.TOKEN || config.token);
