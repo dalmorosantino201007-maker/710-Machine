@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, Collection, MessageEmbed, MessageActionRow, MessageButton, Modal, TextInputComponent } = require('discord.js');
+const { Client, Collection, MessageEmbed, MessageActionRow, MessageButton, Modal, TextInputComponent, MessageSelectMenu } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
@@ -9,7 +9,7 @@ const config = require('./DataBaseJson/config.json');
 moment.locale('es');
 
 const client = new Client({
-    intents: ["GUILDS", "GUILD_MEMBERS", "GUILD_MESSAGES", "GUILD_MESSAGE_REACTIONS", "GUILD_VOICE_STATES", "GUILD_PRESENCES", "GUILD_BANS"],
+    intents: ["GUILDS", "GUILD_MEMBERS", "GUILD_MESSAGES", "GUILD_MESSAGE_REACTIONS", "GUILD_VOICE_STATES", "GUILD_PRESENCES", "GUILD_BANS", "DIRECT_MESSAGES"],
     partials: ["MESSAGE", "CHANNEL", "REACTION", "USER", "GUILD_MEMBER"],
 });
 
@@ -54,44 +54,53 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
+    // --- LÓGICA DE CALIFICACIÓN POR MENÚ ---
+    if (interaction.isSelectMenu() && interaction.customId === "calificar_staff") {
+        const nota = interaction.values[0];
+        const estrellas = "⭐".repeat(parseInt(nota));
+        
+        const embedReview = new MessageEmbed()
+            .setTitle("🌟 Nueva Calificación de Usuario")
+            .setColor("YELLOW")
+            .addFields(
+                { name: "Usuario", value: `${interaction.user.tag}`, inline: true },
+                { name: "Puntuación", value: `${nota}/5 ${estrellas}`, inline: true }
+            )
+            .setTimestamp();
+
+        const canalReviews = interaction.guild ? interaction.guild.channels.cache.get(canalReviewsId) : client.channels.cache.get(canalReviewsId);
+        if (canalReviews) canalReviews.send({ embeds: [embedReview] });
+        
+        return interaction.reply({ content: `✅ ¡Gracias! Has calificado el servicio con ${nota} estrellas.`, ephemeral: true });
+    }
+
     if (interaction.isButton()) {
         const { customId, member, user, channel, guild } = interaction;
 
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
-        // --- LÓGICA DE PARTNER ROL ---
+        // --- LÓGICA DE PARTNER ROL (CORREGIDA) ---
         if (customId === "partner_rol") {
-            const rolId = "1475299059907690648";
+            const rolId = "1470862847671140412"; // Tu ID de rol de Partner
             const rol = guild.roles.cache.get(rolId);
-            if (!rol) return interaction.reply({ content: "❌ El rol no existe.", ephemeral: true });
-            if (member.roles.cache.has(rolId)) {
-                await member.roles.remove(rolId).catch(() => {});
-                return interaction.reply({ content: "✅ Se te ha quitado el rol.", ephemeral: true });
-            } else {
-                await member.roles.add(rolId).catch(() => {});
-                return interaction.reply({ content: "✅ Ahora tienes el rol de **Partner**.", ephemeral: true });
+
+            if (!rol) {
+                return interaction.reply({ content: "❌ Error: El rol de Partner no existe o el ID es incorrecto.", ephemeral: true });
             }
-        }
 
-        // --- LÓGICA DE CALIFICACIONES (ENVIAR AL CANAL DE REVIEWS) ---
-        if (customId.startsWith("calif_")) {
-            const nota = customId.split("_")[1];
-            const estrellas = "⭐".repeat(parseInt(nota));
-            
-            const embedReview = new MessageEmbed()
-                .setTitle("🌟 Nueva Calificación de Usuario")
-                .setColor("YELLOW")
-                .addFields(
-                    { name: "Usuario", value: `${user.tag}`, inline: true },
-                    { name: "Puntuación", value: `${nota}/5 ${estrellas}`, inline: true }
-                )
-                .setTimestamp();
-
-            const canalReviews = guild.channels.cache.get(canalReviewsId);
-            if (canalReviews) canalReviews.send({ embeds: [embedReview] });
-            
-            return interaction.reply({ content: `✅ Gracias por calificar con ${nota} estrellas!`, ephemeral: true });
+            try {
+                if (member.roles.cache.has(rolId)) {
+                    await member.roles.remove(rolId);
+                    return interaction.reply({ content: "✅ Se te ha quitado el rol de **Partner**.", ephemeral: true });
+                } else {
+                    await member.roles.add(rolId);
+                    return interaction.reply({ content: "✅ ¡Verificado! Ahora tienes el rol de **Partner**.", ephemeral: true });
+                }
+            } catch (error) {
+                console.error("Error al gestionar rol:", error);
+                return interaction.reply({ content: "❌ No puedo darte el rol. Asegúrate de que mi rol esté **por encima** del de Partner en la lista de roles.", ephemeral: true });
+            }
         }
 
         // --- GESTIÓN DE TICKETS ---
@@ -107,79 +116,95 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `🔔 ${user} ha enviado una notificación de atención.` });
         }
 
-        // --- CIERRE DE TICKET CON TRANSCRIPCIÓN ---
+        // --- CIERRE DE TICKET ---
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
 
-            await interaction.reply({ content: "⏳ Generando transcripción y cerrando ticket...", ephemeral: true });
+            await interaction.reply({ content: "⏳ Generando transcripción y enviando al usuario...", ephemeral: true });
 
             try {
-                // 1. Crear Transcripción
+                const ticketOwnerPerms = channel.permissionOverwrites.cache.find(p => p.type === 'member' && p.id !== client.user.id);
                 const attachment = await transcripts.createTranscript(channel, {
                     limit: -1,
                     fileName: `transcript-${channel.name}.html`,
                     poweredBy: false
                 });
 
-                // 2. Identificar dueño del ticket
-                const ticketOwnerPerms = channel.permissionOverwrites.cache.find(p => p.type === 'member' && p.id !== client.user.id);
-                
-                // 3. Enviar al canal de TRANSCRIPCIONES
                 const canalTrans = guild.channels.cache.get(canalTranscriptsId);
-                const logEmbed = new MessageEmbed()
-                    .setTitle("📄 Transcripción de Ticket")
-                    .setColor("#2f3136")
-                    .addFields(
-                        { name: "Canal", value: `${channel.name}`, inline: true },
-                        { name: "Cerrado por", value: `${user.tag}`, inline: true },
-                        { name: "Dueño", value: `<@${ticketOwnerPerms?.id || "Desconocido"}>`, inline: true }
-                    )
-                    .setTimestamp();
+                if (canalTrans) {
+                    const logEmbed = new MessageEmbed()
+                        .setTitle("📄 Transcripción de Ticket")
+                        .setColor("#2f3136")
+                        .addFields(
+                            { name: "Canal", value: `${channel.name}`, inline: true },
+                            { name: "Cerrado por", value: `${user.tag}`, inline: true },
+                            { name: "Dueño", value: ticketOwnerPerms ? `<@${ticketOwnerPerms.id}>` : "Desconocido", inline: true }
+                        )
+                        .setTimestamp();
+                    await canalTrans.send({ embeds: [logEmbed], files: [attachment] });
+                }
 
-                if (canalTrans) await canalTrans.send({ embeds: [logEmbed], files: [attachment] });
-
-                // 4. Enviar al usuario por DM (Transcript + Encuesta)
                 if (ticketOwnerPerms) {
                     const targetUser = await client.users.fetch(ticketOwnerPerms.id).catch(() => null);
                     if (targetUser) {
-                        const embedSatisfaccion = new MessageEmbed()
+                        const embedInfo = new MessageEmbed()
                             .setAuthor({ name: "Host | Machine", iconURL: guild.iconURL() })
-                            .setTitle("📝 Encuesta de Satisfacción")
-                            .setColor("#2f3136")
-                            .setDescription(`Tu ticket **${channel.name}** ha sido cerrado.\nPor favor, califica nuestra atención:`)
-                            .setFooter({ text: "Host | Sistema de Tickets" })
+                            .setTitle(`Ticket Cerrado | #${channel.name.split('-')[2] || "Ticket"}`)
+                            .setColor("#2b2d31")
+                            .setDescription("Este ticket ha sido cerrado correctamente y su transcripción fue enviada.")
+                            .addFields(
+                                { name: "👤 Ticket Abierto Por", value: `<@${targetUser.id}>`, inline: true },
+                                { name: "🛠️ Ticket Cerrado Por", value: `${user.tag}`, inline: true },
+                                { name: "🕒 Fecha de cierre", value: moment().format('LLLL'), inline: false },
+                                { name: "📄 Nota", value: "No se proporcionaron notas adicionales." }
+                            )
+                            .setFooter({ text: "Host | Sistema de Tickets", iconURL: guild.iconURL() })
                             .setTimestamp();
 
-                        const rowCalifs = new MessageActionRow().addComponents(
-                            new MessageButton().setCustomId("calif_1").setLabel("1").setStyle("DANGER"),
-                            new MessageButton().setCustomId("calif_2").setLabel("2").setStyle("SECONDARY"),
-                            new MessageButton().setCustomId("calif_3").setLabel("3").setStyle("SECONDARY"),
-                            new MessageButton().setCustomId("calif_4").setLabel("4").setStyle("PRIMARY"),
-                            new MessageButton().setCustomId("calif_5").setLabel("5").setStyle("SUCCESS")
+                        const embedEncuesta = new MessageEmbed()
+                            .setAuthor({ name: "Host | Machine", iconURL: guild.iconURL() })
+                            .setTitle("📝 Encuesta de Satisfacción - Soporte Automático")
+                            .setColor("#2b2d31")
+                            .setDescription("Tu ticket fue cerrado correctamente. Agradecemos tu tiempo. Por favor, califica tu experiencia.")
+                            .addFields(
+                                { name: "🎫 Ticket", value: `#${channel.name.split('-')[2] || "Ticket"}`, inline: true },
+                                { name: "📂 Canal", value: `${channel.name}`, inline: true },
+                                { name: "👨‍💼 Staff", value: `<@${user.id}>`, inline: true }
+                            )
+                            .setFooter({ text: "Host | Sistema de Tickets", iconURL: guild.iconURL() });
+
+                        const rowMenu = new MessageActionRow().addComponents(
+                            new MessageSelectMenu()
+                                .setCustomId("calificar_staff")
+                                .setPlaceholder("Selecciona tu calificación (1-5)")
+                                .addOptions([
+                                    { label: "1 - Muy Malo", value: "1", emoji: "⭐" },
+                                    { label: "2 - Malo", value: "2", emoji: "⭐" },
+                                    { label: "3 - Regular", value: "3", emoji: "⭐" },
+                                    { label: "4 - Bueno", value: "4", emoji: "⭐" },
+                                    { label: "5 - Excelente", value: "5", emoji: "⭐" },
+                                ])
                         );
 
                         await targetUser.send({
-                            content: `Hola! Tu ticket ha finalizado. Aquí tienes tu copia:`,
+                            content: `Tu ticket (**${channel.name}**) ha sido cerrado. Aquí tienes el transcript:`,
                             files: [attachment],
-                            embeds: [embedSatisfaccion],
-                            components: [rowCalifs]
+                            embeds: [embedInfo, embedEncuesta],
+                            components: [rowMenu]
                         }).catch(() => {});
                     }
                 }
 
-                // 5. Log normal de cierre
                 enviarLog(new MessageEmbed().setTitle("🔒 Ticket Cerrado").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel.name}`).setColor("ORANGE").setTimestamp());
-
-                // 6. Borrar canal
                 setTimeout(() => channel.delete().catch(() => {}), 5000);
 
             } catch (error) {
                 console.error(error);
-                interaction.followUp({ content: "❌ Error al generar transcripción.", ephemeral: true });
+                interaction.followUp({ content: "❌ Error al procesar el cierre.", ephemeral: true });
             }
         }
 
-        // APERTURA DE MODALES (COMPRA, SOPORTE, PARTNER)
+        // --- APERTURA DE MODALES (COMPRA, SOPORTE, PARTNER) ---
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
@@ -272,7 +297,7 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ==========================================
-// 🔥 SISTEMA DE VIGILANCIA (MENSAJES, ROLES, ETC)
+// 🔥 SISTEMA DE VIGILANCIA
 // ==========================================
 
 client.on('messageCreate', m => {
