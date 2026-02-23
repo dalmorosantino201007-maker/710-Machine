@@ -76,7 +76,7 @@ client.on('interactionCreate', async (interaction) => {
             setTimeout(() => channel.delete().catch(() => {}), 3000);
         }
 
-        // APERTURA DE MODALES CON LAS NUEVAS PREGUNTAS
+        // APERTURA DE MODALES
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
@@ -128,7 +128,7 @@ client.on('interactionCreate', async (interaction) => {
             nombreCanal = `🤝-partner-${interaction.user.username}`;
             camposPersonalizados = [
                 { name: "✅ Add añadido", value: interaction.fields.getTextInputValue('p_add'), inline: true },
-                { name: "🔗 Link del Server", value: interaction.fields.getTextInputValue('p_link'), inline: true }
+                { name: "🔗 Link", value: interaction.fields.getTextInputValue('p_link'), inline: true }
             ];
         }
 
@@ -143,13 +143,13 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            const ticketID = Math.floor(Math.random() * 90000000000000) + 10000000000000;
+            const ticketID = Math.floor(Math.random() * 900000) + 100000;
             const fecha = moment().format('dddd, D [de] MMMM [de] YYYY HH:mm');
 
             const embedTicket = new MessageEmbed()
                 .setTitle("SISTEMA DE TICKETS")
                 .setColor("#2f3136")
-                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.`)
+                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.\n\n**Compra Aqui/Buy here🔎**`)
                 .addFields(
                     { name: "Categoría", value: tipoTicket, inline: true },
                     { name: "ID del Ticket", value: `\`${ticketID}\``, inline: true },
@@ -158,7 +158,8 @@ client.on('interactionCreate', async (interaction) => {
                 )
                 .addFields(camposPersonalizados)
                 .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
-                .setFooter({ text: "710 Shop - Gestión de Tickets" });
+                .setFooter({ text: "710 Shop - Gestión de Tickets" })
+                .setTimestamp();
 
             const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
