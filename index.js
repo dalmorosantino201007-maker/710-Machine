@@ -29,7 +29,7 @@ const CATEGORIAS = {
 try {
     require('./events/welcome')(client); 
 } catch (e) {
-    console.log("⚠️ No se pudo cargar welcome.js, revisa la ruta del archivo.");
+    console.log("⚠️ No se pudo cargar welcome.js, revisa la ruta.");
 }
 
 // --- FUNCIÓN PARA ENVIAR LOGS ---
@@ -39,7 +39,7 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 🕹️ LÓGICA DE INTERACCIONES (TICKETS)
+// 🕹️ LÓGICA DE INTERACCIONES (TICKETS Y MÁS)
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
@@ -56,42 +56,49 @@ client.on('interactionCreate', async (interaction) => {
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
+        // --- BOTONES DE GESTIÓN DE TICKET ---
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-            await interaction.reply({ content: `✅ Staff ${user} asumió el ticket.` });
+            await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
             await channel.setName(`atendido-${user.username}`).catch(() => {});
-            
-            enviarLog(new MessageEmbed()
-                .setTitle("📌 Ticket Asumido")
-                .setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel}`)
-                .setColor("PURPLE").setTimestamp());
+            enviarLog(new MessageEmbed().setTitle("📌 Ticket Asumido").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel}`).setColor("PURPLE").setTimestamp());
+        }
+
+        if (customId === "notificar") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+            return interaction.reply({ content: `🔔 ${user} ha enviado una notificación de atención.` });
         }
 
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-            
-            enviarLog(new MessageEmbed()
-                .setTitle("🔒 Ticket Cerrado")
-                .setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel.name}`)
-                .setColor("ORANGE").setTimestamp());
-
-            await interaction.reply("🔒 Cerrando ticket...");
+            enviarLog(new MessageEmbed().setTitle("🔒 Ticket Cerrado").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel.name}`).setColor("ORANGE").setTimestamp());
+            await interaction.reply("🔒 Cerrando ticket en 3 segundos...");
             setTimeout(() => channel.delete().catch(() => {}), 3000);
         }
 
-        // Abrir Modales
+        // --- APERTURA DE MODALES CON TUS PREGUNTAS ---
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
-                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_prod').setLabel("Producto").setStyle('SHORT').setRequired(true)),
-                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("Método").setStyle('SHORT').setRequired(true))
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_prod').setLabel("¿Que deseas comprar?").setStyle('SHORT').setRequired(true)),
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Que metodos de pagos usaras?").setStyle('SHORT').setRequired(true)),
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_cant').setLabel("¿Cantidad que deseas comprar?").setStyle('SHORT').setRequired(true))
             );
             return await interaction.showModal(modal);
         }
 
         if (customId === "ticket_soporte") {
             const modal = new Modal().setCustomId('modal_soporte').setTitle('Centro de Soporte');
-            modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("Problema").setStyle('PARAGRAPH').setRequired(true)));
+            modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿En que necesitas Ayuda?").setStyle('PARAGRAPH').setRequired(true)));
+            return await interaction.showModal(modal);
+        }
+
+        if (customId === "ticket_partner") {
+            const modal = new Modal().setCustomId('modal_partner').setTitle('Solicitud de Partner');
+            modal.addComponents(
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_add').setLabel("Ya añadiste nuestro add?").setStyle('SHORT').setRequired(true)),
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_link').setLabel("Manda aqui el link de tu server").setStyle('SHORT').setRequired(true))
+            );
             return await interaction.showModal(modal);
         }
     }
@@ -99,21 +106,30 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isModalSubmit()) {
         await interaction.deferReply({ ephemeral: true });
         
-        let cateId = "";
-        let tipoTicket = "";
-        let nombreCanal = "";
-        let camposLog = "";
+        let cateId, tipoTicket, nombreCanal, camposEmbed = [];
 
         if (interaction.customId === 'modal_compra') {
             cateId = CATEGORIAS.COMPRA;
             tipoTicket = "Compras";
             nombreCanal = `🛒-compra-${interaction.user.username}`;
-            camposLog = `**Producto:** ${interaction.fields.getTextInputValue('p_prod')}\n**Método:** ${interaction.fields.getTextInputValue('p_metodo')}`;
+            camposEmbed = [
+                { name: "📦 Producto", value: interaction.fields.getTextInputValue('p_prod'), inline: true },
+                { name: "💳 Método", value: interaction.fields.getTextInputValue('p_metodo'), inline: true },
+                { name: "🔢 Cantidad", value: interaction.fields.getTextInputValue('p_cant'), inline: true }
+            ];
         } else if (interaction.customId === 'modal_soporte') {
             cateId = CATEGORIAS.SOPORTE;
             tipoTicket = "Soporte";
             nombreCanal = `🛠️-soporte-${interaction.user.username}`;
-            camposLog = `**Problema:** ${interaction.fields.getTextInputValue('p_duda')}`;
+            camposEmbed = [{ name: "❓ Ayuda", value: interaction.fields.getTextInputValue('p_duda') }];
+        } else if (interaction.customId === 'modal_partner') {
+            cateId = CATEGORIAS.PARTNER;
+            tipoTicket = "Partner";
+            nombreCanal = `🤝-partner-${interaction.user.username}`;
+            camposEmbed = [
+                { name: "✅ Add añadido", value: interaction.fields.getTextInputValue('p_add'), inline: true },
+                { name: "🔗 Link", value: interaction.fields.getTextInputValue('p_link'), inline: true }
+            ];
         }
 
         try {
@@ -127,29 +143,31 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            const embedBienvenida = new MessageEmbed()
+            const ticketID = Math.floor(Math.random() * 900000) + 100000;
+            const embedTicket = new MessageEmbed()
                 .setTitle("SISTEMA DE TICKETS")
                 .setColor("#5865F2")
-                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.\n\n${camposLog}`)
-                .setFooter({ text: "710 Shop - Gestión de Tickets" });
+                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto.`)
+                .addFields(
+                    { name: "Categoría", value: tipoTicket, inline: true },
+                    { name: "ID del Ticket", value: `\`${ticketID}\``, inline: true },
+                    { name: "ID del Usuario", value: `\`${interaction.user.id}\``, inline: true }
+                )
+                .addFields(camposEmbed)
+                .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
+                .setFooter({ text: "710 Shop - Gestión de Tickets" })
+                .setTimestamp();
 
-            const botones = new MessageActionRow().addComponents(
+            const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅")
+                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
             );
 
-            await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}>`, embeds: [embedBienvenida], components: [botones] });
+            await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
             await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
             
-            // LOG DE APERTURA
-            enviarLog(new MessageEmbed()
-                .setTitle("🎫 Nuevo Ticket Creado")
-                .setColor("BLUE")
-                .addFields(
-                    { name: "Usuario", value: `${interaction.user.tag}`, inline: true },
-                    { name: "Tipo", value: tipoTicket, inline: true },
-                    { name: "Info", value: camposLog }
-                ).setTimestamp());
+            enviarLog(new MessageEmbed().setTitle("🎫 Ticket Abierto").setDescription(`**Usuario:** ${interaction.user.tag}\n**Tipo:** ${tipoTicket}\n**Canal:** ${canal}`).setColor("BLUE").setTimestamp());
 
         } catch (e) {
             console.error(e);
@@ -159,48 +177,44 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ==========================================
-// 🔥 SISTEMA DE LOGS DE DISCORD 🔥
+// 🔥 SISTEMA DE VIGILANCIA TOTAL (LOGS) 🔥
 // ==========================================
 
 client.on('messageCreate', m => {
     if (!m.guild || m.author.bot || m.channel.id === canalLogsId) return;
-    enviarLog(new MessageEmbed()
-        .setAuthor({ name: `Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL() })
-        .setColor("#2f3136")
-        .setDescription(`**Canal:** ${m.channel}\n**Contenido:**\n${m.content || "*[Archivo]*"}`)
-        .setTimestamp());
+    enviarLog(new MessageEmbed().setAuthor({ name: `Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL() }).setColor("#2f3136").setDescription(`**Canal:** ${m.channel}\n**Contenido:**\n${m.content || "*[Archivo/Embed]*"}`).setTimestamp());
 });
 
 client.on('messageDelete', m => {
     if (!m.guild || m.author?.bot) return;
-    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("#ff0000").addFields(
-        { name: "Autor", value: `${m.author.tag}`, inline: true },
-        { name: "Canal", value: `${m.channel}`, inline: true },
-        { name: "Contenido", value: `\`\`\`${m.content || "Sin texto"}\`\`\`` }
-    ).setTimestamp());
+    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("#ff0000").addFields({ name: "Autor", value: `${m.author.tag}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: `\`\`\`${m.content || "Sin texto"}\`\`\`` }).setTimestamp());
 });
 
 client.on('messageUpdate', (o, n) => {
     if (o.author?.bot || o.content === n.content) return;
-    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields(
-        { name: "Autor", value: `${o.author.tag}`, inline: true },
-        { name: "Antes", value: `\`\`\`${o.content}\`\`\`` },
-        { name: "Después", value: `\`\`\`${n.content}\`\`\`` }
-    ).setTimestamp());
+    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content}\`\`\`` }).setTimestamp());
+});
+
+client.on('guildMemberAdd', m => {
+    enviarLog(new MessageEmbed().setTitle("📥 Miembro Nuevo").setColor("#00ff00").setDescription(`**${m.user.tag}** se unió.`).setTimestamp());
+});
+
+client.on('guildMemberRemove', m => {
+    enviarLog(new MessageEmbed().setTitle("📤 Miembro Salió").setColor("#ff4500").setDescription(`**${m.user.tag}** salió.`).setTimestamp());
 });
 
 client.on('guildMemberUpdate', (o, n) => {
     const oR = o.roles.cache, nR = n.roles.cache;
     if (oR.size < nR.size) {
         const role = nR.filter(r => !oR.has(r.id)).first();
-        enviarLog(new MessageEmbed().setTitle("➕ Rol Añadido").setColor("#2ecc71").setDescription(`A **${n.user.tag}** se le asignó ${role}`).setTimestamp());
+        enviarLog(new MessageEmbed().setTitle("➕ Rol Añadido").setColor("#2ecc71").setDescription(`A **${n.user.tag}** se le dio ${role}`).setTimestamp());
     } else if (oR.size > nR.size) {
         const role = oR.filter(r => !nR.has(r.id)).first();
         enviarLog(new MessageEmbed().setTitle("➖ Rol Quitado").setColor("#e74c3c").setDescription(`A **${n.user.tag}** se le quitó ${role}`).setTimestamp());
     }
 });
 
-client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("#1abc9c").setDescription(`Nombre: ${c.name}`).setTimestamp()));
+client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("#1abc9c").setDescription(`Canal: ${c.name}`).setTimestamp()));
 client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🗑️ Canal Borrado").setColor("#e67e22").setDescription(`Nombre: ${c.name}`).setTimestamp()));
 
 client.on('voiceStateUpdate', (o, n) => {
@@ -210,7 +224,7 @@ client.on('voiceStateUpdate', (o, n) => {
 });
 
 client.on('ready', () => { 
-    console.log(`🔥 ${client.user.username} ONLINE`); 
+    console.log(`🔥 ${client.user.username} - SISTEMA PRO ACTIVADO`); 
 });
 
 client.login(process.env.TOKEN || config.token);
