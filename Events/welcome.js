@@ -32,7 +32,7 @@ module.exports = (client) => {
 
     // Fix: Si el canal no está en cache, lo buscamos (fetch)
     const channelId = "1469953972197654570";
-    let welcomeChannel = client.channels.cache.get(channelId);
+    let welcomeChannel = client.channels.cache.get(channelId);"1469953972197654570"
     if (!welcomeChannel) {
         welcomeChannel = await client.channels.fetch(channelId).catch(() => null);
     }
