@@ -94,6 +94,20 @@ client.on('interactionCreate', async (interaction) => {
             enviarLog(new MessageEmbed().setTitle("📌 Ticket Asumido").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel}`).setColor("PURPLE").setTimestamp());
         }
 
+        // --- FUNCIÓN NOTIFICAR ---
+        if (customId === "notificar") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+            
+            // Buscamos al usuario que tiene permisos de ver el canal (que no sea bot ni staff)
+            const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
+            
+            if (targetId) {
+                return interaction.reply({ content: `🔔 <@${targetId}>, el Staff está esperando tu respuesta para continuar con el proceso.` });
+            } else {
+                return interaction.reply({ content: "📢 ¡Atención! El Staff solicita tu presencia en este ticket." });
+            }
+        }
+
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
             const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
@@ -137,7 +151,6 @@ client.on('interactionCreate', async (interaction) => {
                 const attachment = await transcripts.createTranscript(channel, { limit: -1, fileName: `transcript-${channel.name}.html`, poweredBy: false });
 
                 if (targetUser) {
-                    // --- EMBED 1: INFORMACIÓN DEL CIERRE ---
                     const embedInfo = new MessageEmbed()
                         .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
                         .setTitle(`📑 Ticket Cerrado`)
@@ -151,7 +164,6 @@ client.on('interactionCreate', async (interaction) => {
                         )
                         .setFooter({ text: 'Host | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
 
-                    // --- EMBED 2: ENCUESTA DE SATISFACCIÓN ---
                     const embedEncuesta = new MessageEmbed()
                         .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
                         .setTitle("📝 Encuesta de Satisfacción - Soporte Automático")
