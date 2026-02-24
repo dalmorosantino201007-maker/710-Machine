@@ -9,6 +9,7 @@ module.exports = {
     const requiredRoleId = "1469967630365622403";
     const member = interaction.member;
 
+    // Verificación de permisos
     if (!member.roles.cache.has(requiredRoleId)) {
       return interaction.reply({
         content: "<:warninghost:1383935369275379874> | No tienes permiso para usar este comando.",
@@ -20,10 +21,10 @@ module.exports = {
     const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const guildIcon = interaction.guild.iconURL({ dynamic: true });
 
+    // ID que me pasaste: 1469619944676135033
     const feedbackChannelId = "1469619944676135033";
-    const feedbackChannelLink = `https://discord.com/channels/1469618754282586154/1470869238397931645`;
+    const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
 
-    // Cambiado a MessageEmbed (v13)
     const embed = new Discord.MessageEmbed()
       .setColor(`${config.colorpredeterminado}`)
       .setTitle("**__Feedback__**")
@@ -33,7 +34,7 @@ module.exports = {
         `Tu compra ha sido completada correctamente.\n\n` +
 
         `**💬 Deja tu opinión**\n` +
-        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1470869238397931645>.\n` +
+        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#${feedbackChannelId}>.\n` +
         `> Tu opinión nos ayuda a seguir mejorando nuestros servicios.\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -45,7 +46,7 @@ module.exports = {
         `Your purchase has been successfully processed.\n\n` +
 
         `**💬 Leave your feedback**\n` +
-        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1470869238397931645>.\n` +
+        `> If you enjoyed your experience, feel free to leave a positive reaction in <#${feedbackChannelId}>.\n` +
         `> Your feedback helps us grow and improve.\n\n` +
 
         `**🛠️ Support**\n` +
@@ -54,12 +55,11 @@ module.exports = {
       .setFooter({ text: botName, iconURL: botAvatar })
       .setTimestamp();
 
-    // Cambiado a MessageActionRow y MessageButton (v13)
     const button = new Discord.MessageActionRow().addComponents(
       new Discord.MessageButton()
         .setLabel("💌 Dejar Feedback")
-        .setStyle('LINK') // En v13 el estilo es un string en mayúsculas
-        .setURL(feedbackChannelLink)"https://discord.com/channels/1469618754282586154/1470869238397931645"
+        .setStyle('LINK') 
+        .setURL(feedbackChannelLink) // Corregido: se quitó el string pegado que rompía el código
     );
 
     await interaction.reply({ embeds: [embed], components: [button] });
