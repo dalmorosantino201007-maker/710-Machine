@@ -53,23 +53,20 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 🕹️ LÓGICA DE INTERACCIONES
+// 🕹️ LÓGICA DE INTERACCIONES (TICKETS)
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
-    // COMANDOS
     if (interaction.isCommand()) {
         const cmd = client.slashCommands.get(interaction.commandName);
         if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
     }
 
-    // CALIFICACIONES (SELECT MENU)
     if (interaction.isSelectMenu() && interaction.customId.startsWith("calificar_staff_")) {
         const staffId = interaction.customId.split('_')[2];
         const nota = interaction.values[0];
         const estrellas = "⭐".repeat(parseInt(nota));
-
         const embedReview = new MessageEmbed()
             .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
             .setTitle("🌟 Nueva Calificación de Servicio")
@@ -80,16 +77,13 @@ client.on('interactionCreate', async (interaction) => {
                 { name: "📊 Puntuación", value: `${estrellas} (${nota}/5)`, inline: false }
             )
             .setTimestamp();
-
         const canalReviews = client.channels.cache.get(canalReviewsId);
         if (canalReviews) canalReviews.send({ embeds: [embedReview] });
         return interaction.reply({ content: `✅ ¡Gracias! Has calificado la atención con ${nota} estrellas.`, ephemeral: true });
     }
 
-    // BOTONES
     if (interaction.isButton()) {
-        const { customId, member, user, channel, guild } = interaction;
-
+        const { customId, member, user, channel } = interaction;
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
@@ -102,20 +96,12 @@ client.on('interactionCreate', async (interaction) => {
 
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-            
             const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
-            const inputNota = new TextInputComponent()
-                .setCustomId('nota_staff')
-                .setLabel("Deja una nota para el usuario")
-                .setPlaceholder("Ej: Gracias por tu compra!")
-                .setStyle('PARAGRAPH')
-                .setRequired(false);
-
+            const inputNota = new TextInputComponent().setCustomId('nota_staff').setLabel("Deja una nota para el usuario").setPlaceholder("Ej: Gracias por tu compra!").setStyle('PARAGRAPH').setRequired(false);
             modalNota.addComponents(new MessageActionRow().addComponents(inputNota));
             return await interaction.showModal(modalNota);
         }
 
-        // APERTURA DE TICKETS
         if (customId === "ticket_compra") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
@@ -140,34 +126,48 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
-    // MODALS
     if (interaction.isModalSubmit()) {
-        // MODAL DE CIERRE CON NOTA
         if (interaction.customId === 'modal_nota_cierre') {
             await interaction.deferReply({ ephemeral: true });
             const notaStaff = interaction.fields.getTextInputValue('nota_staff') || "No se proporcionaron notas adicionales.";
             const { channel, user, guild } = interaction;
-
             try {
                 const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
                 const targetUser = targetId ? await client.users.fetch(targetId) : null;
                 const attachment = await transcripts.createTranscript(channel, { limit: -1, fileName: `transcript-${channel.name}.html`, poweredBy: false });
 
                 if (targetUser) {
+                    // --- EMBED 1: INFORMACIÓN DEL CIERRE ---
                     const embedInfo = new MessageEmbed()
                         .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
                         .setTitle(`📑 Ticket Cerrado`)
                         .setColor("#2f3136")
+                        .setDescription("Este ticket ha sido cerrado correctamente y su transcripción fue enviada.")
                         .addFields(
-                            { name: "👤 Abierto Por", value: `<@${targetUser.id}>`, inline: true },
-                            { name: "🛠️ Cerrado Por", value: `<@${user.id}>`, inline: true },
+                            { name: "👤 Ticket Abierto Por", value: `<@${targetUser.id}>`, inline: true },
+                            { name: "🛠️ Ticket Cerrado Por", value: `<@${user.id}>`, inline: true },
+                            { name: "🕒 Fecha de cierre", value: `\`${moment().format('dddd, D [de] MMMM [de] YYYY, HH:mm')}\``, inline: true },
                             { name: "📄 Nota", value: `\`\`\`${notaStaff}\`\`\`` }
-                        );
+                        )
+                        .setFooter({ text: 'Host | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
+
+                    // --- EMBED 2: ENCUESTA DE SATISFACCIÓN ---
+                    const embedEncuesta = new MessageEmbed()
+                        .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
+                        .setTitle("📝 Encuesta de Satisfacción - Soporte Automático")
+                        .setColor("#2f3136")
+                        .setDescription(`Tu ticket fue cerrado correctamente. Agradecemos tu tiempo, por favor califica tu experiencia.`)
+                        .addFields(
+                            { name: "🎫 Ticket", value: `\`${channel.name}\``, inline: true },
+                            { name: "📁 Canal", value: `\`#${channel.name}\``, inline: true },
+                            { name: "👷 Staff", value: `<@${user.id}>`, inline: true }
+                        )
+                        .setFooter({ text: 'Host | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
 
                     const rowEncuesta = new MessageActionRow().addComponents(
                         new MessageSelectMenu()
                             .setCustomId(`calificar_staff_${user.id}`)
-                            .setPlaceholder('Califica nuestra atención')
+                            .setPlaceholder('Selecciona tu calificación (1-5)')
                             .addOptions([
                                 { label: '5 Estrellas', value: '5', emoji: '⭐' },
                                 { label: '4 Estrellas', value: '4', emoji: '⭐' },
@@ -177,31 +177,37 @@ client.on('interactionCreate', async (interaction) => {
                             ])
                     );
 
-                    await targetUser.send({ content: 'Tu ticket ha sido cerrado. Aquí tienes la transcripción:', embeds: [embedInfo], files: [attachment], components: [rowEncuesta] }).catch(() => {});
+                    await targetUser.send({ 
+                        content: `Tu ticket (\`${channel.name}\`) ha sido cerrado. Aquí tienes la transcripción:`, 
+                        embeds: [embedInfo, embedEncuesta], 
+                        files: [attachment], 
+                        components: [rowEncuesta] 
+                    }).catch(() => {});
                 }
 
                 const canalTrans = guild.channels.cache.get(canalTranscriptsId);
                 if (canalTrans) await canalTrans.send({ content: `Transcripción: **${channel.name}**`, files: [attachment] });
 
-                await interaction.editReply("✅ Ticket cerrado correctamente.");
-                setTimeout(() => channel.delete().catch(() => {}), 2000);
+                await interaction.editReply("✅ Ticket finalizado y reporte enviado al usuario.");
+                setTimeout(() => channel.delete().catch(() => {}), 3000);
             } catch (e) { console.error(e); }
             return;
         }
 
-        // OTROS MODALS (APERTURA)
         await interaction.deferReply({ ephemeral: true });
-        let cateId, tipoTicket, nombreCanal, camposPersonalizados = [];
-        
+        let cateId, tipoTicket, nombreCanal, camposExtra = [];
         if (interaction.customId === 'modal_compra') {
-            cateId = CATEGORIAS.COMPRA; tipoTicket = "Buy"; nombreCanal = `🛒-buy-${interaction.user.username}`;
-            camposPersonalizados = [{ name: "📦 Producto", value: interaction.fields.getTextInputValue('p_prod'), inline: true }];
+            cateId = CATEGORIAS.COMPRA; tipoTicket = "Compra"; nombreCanal = `🛒-buy-${interaction.user.username}`;
+            camposExtra = [
+                { name: '📦 Producto', value: `\`${interaction.fields.getTextInputValue('p_prod')}\``, inline: true },
+                { name: '💳 Método', value: `\`${interaction.fields.getTextInputValue('p_metodo')}\``, inline: true }
+            ];
         } else if (interaction.customId === 'modal_soporte') {
-            cateId = CATEGORIAS.SOPORTE; tipoTicket = "Support"; nombreCanal = `🛠️-soporte-${interaction.user.username}`;
-            camposPersonalizados = [{ name: "❓ Ayuda", value: interaction.fields.getTextInputValue('p_duda') }];
+            cateId = CATEGORIAS.SOPORTE; tipoTicket = "Soporte"; nombreCanal = `🛠️-soporte-${interaction.user.username}`;
+            camposExtra = [{ name: '❓ Ayuda', value: `\`${interaction.fields.getTextInputValue('p_duda')}\``, inline: false }];
         } else if (interaction.customId === 'modal_partner') {
             cateId = CATEGORIAS.PARTNER; tipoTicket = "Partner"; nombreCanal = `🤝-partner-${interaction.user.username}`;
-            camposPersonalizados = [{ name: "🔗 Link", value: interaction.fields.getTextInputValue('p_link'), inline: true }];
+            camposExtra = [{ name: '🔗 Link', value: `\`${interaction.fields.getTextInputValue('p_link')}\``, inline: false }];
         }
 
         try {
@@ -214,40 +220,43 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            const ticketID = Math.floor(Math.random() * 90000) + 10000;
+            const ticketID = Math.floor(Math.random() * 9000000000) + 1000000000;
             const embedTicket = new MessageEmbed()
-                .setColor('#0099ff')
-                .setAuthor({ name: 'Saytus | Machine' })
-                .setTitle(`🎟️ Ticket #${ticketID} creado`)
-                .setDescription(`¡Bienvenido/a al **Sistema de Tickets de Saytus**! <@!${interaction.user.id}>\n\nNuestro equipo <@&${rolPermitidoId}> te atenderá pronto.`)
+                .setColor('#3b5998')
+                .setAuthor({ name: '710 Bot Shop', iconURL: interaction.guild.iconURL() })
+                .setTitle('SISTEMA DE TICKETS')
+                .setThumbnail(interaction.user.displayAvatarURL())
+                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
                 .addFields(
-                    { name: '📂 Categoría', value: tipoTicket, inline: true },
-                    { name: '🆔 Canal', value: `<#${canal.id}>`, inline: true },
-                    { name: '🎟️ Número', value: `#${ticketID}`, inline: true },
-                    { name: '📅 Fecha', value: moment().format('D/MM/YYYY'), inline: true },
-                    { name: '👤 Usuario', value: `<@!${interaction.user.id}>`, inline: true }
+                    { name: 'Categoría', value: `\`${tipoTicket}\``, inline: true },
+                    { name: 'ID del Ticket', value: `\`${ticketID}\``, inline: true },
+                    { name: 'Fecha', value: `\`${moment().format('D/MM/YYYY HH:mm')}\``, inline: true },
+                    { name: 'Usuario', value: `\`${interaction.user.username}\` (${interaction.user.id})`, inline: false }
                 )
-                .addFields(camposPersonalizados)
+                .addFields(camposExtra)
+                .setFooter({ text: '710 Shop - Gestión de Tickets' })
                 .setTimestamp();
 
             const row = new MessageActionRow().addComponents(
-                new MessageButton().setCustomId("fechar_ticket").setLabel("Close").setStyle("DANGER").setEmoji("🔒"),
-                new MessageButton().setCustomId("asumir").setLabel("Staff").setStyle("SECONDARY").setEmoji("👤")
+                new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
+                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
             );
 
-            await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
+            await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}> Staff 👥`, embeds: [embedTicket], components: [row] });
             await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
+            enviarLog(new MessageEmbed().setTitle("🎫 Ticket Creado").setColor("BLUE").setDescription(`**Usuario:** ${interaction.user.tag}\n**Canal:** ${canal}\n**Tipo:** ${tipoTicket}`).setTimestamp());
         } catch (e) { console.error(e); }
     }
 });
 
 // ==========================================
-// 🔥 SISTEMA DE VIGILANCIA
+// 🔥 SISTEMA DE VIGILANCIA (FULL LOGS)
 // ==========================================
 
 client.on('messageCreate', m => {
     if (!m.guild || m.author.bot || m.channel.id === canalLogsId) return;
-    enviarLog(new MessageEmbed().setAuthor({ name: `Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL() }).setColor("#2f3136").setDescription(`**Canal:** ${m.channel}\n**Contenido:**\n${m.content || "*[Archivo]*"}`).setTimestamp());
+    enviarLog(new MessageEmbed().setAuthor({ name: `Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL() }).setColor("#2f3136").setDescription(`**Canal:** ${m.channel}\n**Contenido:**\n${m.content || "*[Archivo/Embed]*"}`).setTimestamp());
 });
 
 client.on('messageDelete', m => {
@@ -260,8 +269,23 @@ client.on('messageUpdate', (o, n) => {
     enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content}\`\`\`` }).setTimestamp());
 });
 
-client.on('channelCreate', c => {
-    enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("GREEN").setDescription(`**Nombre:** ${c.name}`).setTimestamp());
+client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("GREEN").setDescription(`**Nombre:** ${c.name}\n**Tipo:** ${c.type}`).setTimestamp()));
+client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🗑️ Canal Eliminado").setColor("RED").setDescription(`**Nombre:** ${c.name}`).setTimestamp()));
+client.on('channelUpdate', (o, n) => {
+    if (o.name !== n.name) enviarLog(new MessageEmbed().setTitle("✏️ Canal Editado (Nombre)").setColor("ORANGE").setDescription(`**Antes:** ${o.name}\n**Después:** ${n.name}`).setTimestamp());
+});
+
+client.on('roleCreate', r => enviarLog(new MessageEmbed().setTitle("🆕 Rol Creado").setColor("GREEN").setDescription(`**Rol:** ${r.name}\n**ID:** ${r.id}`).setTimestamp()));
+client.on('roleDelete', r => enviarLog(new MessageEmbed().setTitle("🗑️ Rol Eliminado").setColor("RED").setDescription(`**Rol:** ${r.name}`).setTimestamp()));
+client.on('roleUpdate', (o, n) => {
+    if (o.name !== n.name) enviarLog(new MessageEmbed().setTitle("✏️ Rol Editado").setColor("ORANGE").setDescription(`**Antes:** ${o.name}\n**Después:** ${n.name}`).setTimestamp());
+});
+
+client.on('guildMemberUpdate', (o, n) => {
+    const addedRoles = n.roles.cache.filter(r => !o.roles.cache.has(r.id));
+    const removedRoles = o.roles.cache.filter(r => !n.roles.cache.has(r.id));
+    if (addedRoles.size > 0) addedRoles.forEach(r => enviarLog(new MessageEmbed().setTitle("➕ Rol Agregado").setColor("BLUE").setDescription(`**Usuario:** ${n.user.tag}\n**Rol:** ${r.name}`).setTimestamp()));
+    if (removedRoles.size > 0) removedRoles.forEach(r => enviarLog(new MessageEmbed().setTitle("➖ Rol Quitado").setColor("PURPLE").setDescription(`**Usuario:** ${n.user.tag}\n**Rol:** ${r.name}`).setTimestamp()));
 });
 
 client.on('guildMemberAdd', m => {
@@ -271,8 +295,26 @@ client.on('guildMemberAdd', m => {
     enviarLog(new MessageEmbed().setTitle("📥 Miembro Nuevo").setColor("#00ff00").setDescription(`**${m.user.tag}** entró al servidor.`).setTimestamp());
 });
 
+client.on('guildMemberRemove', m => {
+    enviarLog(new MessageEmbed().setTitle("📤 Miembro Salió").setColor("#ff0000").setDescription(`**${m.user.tag}** abandonó el servidor.`).setTimestamp());
+});
+
+// --- 🚀 EVENTO READY (INICIO) ---
 client.on('ready', async () => { 
-    console.log(`🔥 ${client.user.username} - VIGILANCIA Y TICKETS ACTIVADOS`); 
+    console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
+    
+    // Mensaje de Encendido en Logs
+    const embedReady = new MessageEmbed()
+        .setTitle("✅ Bot Encendido Correctamente")
+        .setColor("GREEN")
+        .setDescription(`El bot **${client.user.tag}** ya está operativo.`)
+        .addFields(
+            { name: "📡 Estado", value: "En línea", inline: true },
+            { name: "⏰ Hora", value: moment().format('HH:mm:ss'), inline: true }
+        )
+        .setTimestamp();
+    
+    enviarLog(embedReady);
 });
 
 client.login(process.env.TOKEN || config.token);
