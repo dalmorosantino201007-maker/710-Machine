@@ -59,7 +59,7 @@ module.exports = {
       new Discord.MessageButton()
         .setLabel("💌 Dejar Feedback")
         .setStyle('LINK') // En v13 el estilo es un string en mayúsculas
-        .setURL(feedbackChannelLink)
+        .setURL(feedbackChannelLink)"https://discord.com/channels/1469618754282586154/1470869238397931645"
     );
 
     await interaction.reply({ embeds: [embed], components: [button] });
