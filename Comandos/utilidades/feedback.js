@@ -21,8 +21,9 @@ module.exports = {
     const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const guildIcon = interaction.guild.iconURL({ dynamic: true });
 
-    // ID que me pasaste: 1470869238397931645
+    // ID del canal de feedback
     const feedbackChannelId = "1470869238397931645";  
+    // URL Corregida: Sin comillas invertidas extra y con el formato correcto de Discord
     const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
 
     const embed = new Discord.MessageEmbed()
@@ -34,7 +35,7 @@ module.exports = {
         `Tu compra ha sido completada correctamente.\n\n` +
 
         `**💬 Deja tu opinión**\n` +
-        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1470869238397931645>.\n` +
+        `> Si disfrutaste de tu experiencia, te invitamos a dejar una opinión en <#${feedbackChannelId}>.\n` +
         `> Tu opinión nos ayuda a seguir mejorando nuestros servicios.\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -46,7 +47,7 @@ module.exports = {
         `Your purchase has been successfully processed.\n\n` +
 
         `**💬 Leave your feedback**\n` +
-        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1470869238397931645>.\n` +
+        `> If you enjoyed your experience, feel free to leave your feedback in <#${feedbackChannelId}>.\n` +
         `> Your feedback helps us grow and improve.\n\n` +
 
         `**🛠️ Support**\n` +
@@ -59,7 +60,7 @@ module.exports = {
       new Discord.MessageButton()
         .setLabel("💌 Dejar Feedback")
         .setStyle('LINK') 
-        .setURL(feedbackChannelLink) // Corregido: se quitó el string pegado que rompía el código
+        .setURL(feedbackChannelLink) 
     );
 
     await interaction.reply({ embeds: [embed], components: [button] });
