@@ -21,8 +21,8 @@ module.exports = {
     const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const guildIcon = interaction.guild.iconURL({ dynamic: true });
 
-    // ID que me pasaste: 1469619944676135033
-    const feedbackChannelId = "1469619944676135033";
+    // ID que me pasaste: 1470869238397931645
+    const feedbackChannelId = "1470869238397931645";  
     const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
 
     const embed = new Discord.MessageEmbed()
@@ -34,7 +34,7 @@ module.exports = {
         `Tu compra ha sido completada correctamente.\n\n` +
 
         `**💬 Deja tu opinión**\n` +
-        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#${feedbackChannelId}>.\n` +
+        `> Si disfrutaste de tu experiencia, te invitamos a dejar una reacción positiva en <#1470869238397931645>.\n` +
         `> Tu opinión nos ayuda a seguir mejorando nuestros servicios.\n\n` +
 
         `**🛠️ Soporte**\n` +
@@ -46,7 +46,7 @@ module.exports = {
         `Your purchase has been successfully processed.\n\n` +
 
         `**💬 Leave your feedback**\n` +
-        `> If you enjoyed your experience, feel free to leave a positive reaction in <#${feedbackChannelId}>.\n` +
+        `> If you enjoyed your experience, feel free to leave a positive reaction in <#1470869238397931645>.\n` +
         `> Your feedback helps us grow and improve.\n\n` +
 
         `**🛠️ Support**\n` +
