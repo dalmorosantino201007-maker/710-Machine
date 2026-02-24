@@ -233,6 +233,33 @@ client.on('interactionCreate', async (interaction) => {
 
     // --- MANEJO DE ENVÍO DE MODALES ---
     if (interaction.isModalSubmit()) {
+        
+        // --- NUEVA LÓGICA: MODAL DE ANUNCIO (EMBED) ---
+        if (interaction.customId === 'modalanuncio_v2') {
+            await interaction.deferReply({ ephemeral: true });
+            const titulo = interaction.fields.getTextInputValue('titulo');
+            const descripcion = interaction.fields.getTextInputValue('desc');
+            const thumbnail = interaction.fields.getTextInputValue('thumbnail');
+            const banner = interaction.fields.getTextInputValue('banner');
+            const color = interaction.fields.getTextInputValue('cor');
+
+            try {
+                const embedPersonalizado = new MessageEmbed()
+                    .setDescription(descripcion)
+                    .setColor(color.startsWith('#') ? color : `#${color}`);
+
+                if (titulo) embedPersonalizado.setTitle(titulo);
+                if (thumbnail && thumbnail.startsWith('http')) embedPersonalizado.setThumbnail(thumbnail);
+                if (banner && banner.startsWith('http')) embedPersonalizado.setImage(banner);
+
+                await interaction.channel.send({ embeds: [embedPersonalizado] });
+                return interaction.editReply({ content: "✅ Embed enviado correctamente." });
+            } catch (e) {
+                return interaction.editReply({ content: "❌ Error al crear el embed. Revisa los links o el color HEX." });
+            }
+        }
+
+        // --- LÓGICA DE TICKETS EXISTENTE ---
         await interaction.deferReply({ ephemeral: true });
         let cateId, tipoTicket, nombreCanal, camposPersonalizados = [];
 
