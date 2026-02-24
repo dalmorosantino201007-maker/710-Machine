@@ -20,8 +20,8 @@ module.exports = {
     const botAvatar = client.user.displayAvatarURL({ dynamic: true });
     const guildIcon = interaction.guild.iconURL({ dynamic: true });
 
-    const feedbackChannelId = "1475299529908682822";
-    const feedbackChannelLink = `https://discord.com/channels/${interaction.guild.id}/${feedbackChannelId}`;
+    const feedbackChannelId = "1469619944676135033";
+    const feedbackChannelLink = `https://discord.com/channels/1469618754282586154/1470869238397931645`;
 
     // Cambiado a MessageEmbed (v13)
     const embed = new Discord.MessageEmbed()
