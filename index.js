@@ -84,6 +84,22 @@ client.on('interactionCreate', async (interaction) => {
 
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
+        
+        // --- LÓGICA PARA EL BOTÓN DE ROL PARTNER (NUEVO) ---
+        if (customId === "partner_rol") {
+            const rolPartnerId = "1470862847671140412"; 
+            const rol = interaction.guild.roles.cache.get(rolPartnerId);
+            if (!rol) return interaction.reply({ content: "❌ El rol de partner no existe.", ephemeral: true });
+
+            if (member.roles.cache.has(rolPartnerId)) {
+                await member.roles.remove(rolPartnerId);
+                return interaction.reply({ content: "✅ Se te ha quitado el rol de **Partner**.", ephemeral: true });
+            } else {
+                await member.roles.add(rolPartnerId);
+                return interaction.reply({ content: "✅ ¡Perfecto! Ahora tienes el rol de **Partner**.", ephemeral: true });
+            }
+        }
+
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
@@ -94,13 +110,9 @@ client.on('interactionCreate', async (interaction) => {
             enviarLog(new MessageEmbed().setTitle("📌 Ticket Asumido").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel}`).setColor("PURPLE").setTimestamp());
         }
 
-        // --- FUNCIÓN NOTIFICAR ---
         if (customId === "notificar") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-            
-            // Buscamos al usuario que tiene permisos de ver el canal (que no sea bot ni staff)
             const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
-            
             if (targetId) {
                 return interaction.reply({ content: `🔔 <@${targetId}>, el Staff está esperando tu respuesta para continuar con el proceso.` });
             } else {
@@ -141,7 +153,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.isModalSubmit()) {
-        // --- 🔥 LÓGICA PARA RECIBIR EL MODAL DEL EMBED ---
         if (interaction.customId === 'modal_embed_personalizado') {
             const titulo = interaction.fields.getTextInputValue('titulo');
             const desc = interaction.fields.getTextInputValue('desc');
@@ -165,7 +176,6 @@ client.on('interactionCreate', async (interaction) => {
             );
 
             await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
-            // RESPUESTA OBLIGATORIA PARA EVITAR EL ERROR "LA APLICACIÓN NO RESPONDE"
             return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
         }
 
@@ -305,9 +315,7 @@ client.on('messageDelete', m => {
 });
 
 client.on('messageUpdate', (o, n) => {
-    // FIX DE SEGURIDAD: SI EL MENSAJE NO ESTÁ EN CACHÉ O NO TIENE AUTOR, SE IGNORA PARA QUE NO CRASHEE
     if (!o.author || o.author.bot || o.content === n.content) return;
-    
     enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content || "Sin contenido"}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content || "Sin contenido"}\`\`\`` }).setTimestamp());
 });
 
@@ -345,7 +353,6 @@ client.on('guildMemberRemove', m => {
 client.on('ready', async () => { 
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
     
-    // Mensaje de Encendido en Logs
     const embedReady = new MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
         .setColor("GREEN")
