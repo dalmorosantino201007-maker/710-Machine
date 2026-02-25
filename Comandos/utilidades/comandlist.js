@@ -1,10 +1,14 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 
 module.exports = {
+    // La propiedad 'data' es lo que el bot envía a Discord
     data: new SlashCommandBuilder()
-        .setName('comandlist')
+        .setName('comandlist') // Asegúrate que esté todo en minúsculas y sin espacios
         .setDescription('Muestra la lista completa de comandos y sus permisos'),
-    run: async (client, interaction) => {
-        // Al igual que el anterior, la respuesta está programada en el index.js
+    
+    // La función 'run' debe estar presente aunque la lógica principal esté en el index.js
+    async run(client, interaction) {
+        // Esto sirve como respaldo si el handler intenta ejecutarlo desde aquí
+        return; 
     },
 };

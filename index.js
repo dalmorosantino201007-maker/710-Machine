@@ -433,7 +433,6 @@ client.on('messageDelete', m => {
 });
 
 client.on('messageUpdate', (o, n) => {
-    // CORRECCIÓN PARA EVITAR CRASHEO
     if (!o || !o.author || o.author.bot || o.content === n.content) return;
 
     enviarLog(new MessageEmbed()
@@ -482,14 +481,27 @@ client.on('guildMemberRemove', m => {
 client.on('ready', async () => { 
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
 
-    // --- AGREGADO: REGISTRO AUTOMÁTICO DE COMANDOS ---
+    // --- AGREGADO: REGISTRO AUTOMÁTICO DE COMANDOS (MODIFICADO PARA FUNCIONAR) ---
     try {
-        // Obtenemos los comandos que cargó el handler
-        const comandosParaRegistrar = client.slashCommands.map(cmd => cmd.data);
+        // Filtrar y convertir a JSON para evitar errores de API
+        const comandosParaRegistrar = client.slashCommands
+            .filter(cmd => cmd.data) 
+            .map(cmd => cmd.data.toJSON());
         
-        // Registramos los comandos en la API de Discord
+        console.log(`🔎 Cargando ${comandosParaRegistrar.length} comandos slash...`);
+
+        // Registrar en el servidor específico para que sea INSTANTÁNEO
+        const guildId = '1469595804598501396'; 
+        const guild = client.guilds.cache.get(guildId);
+        
+        if (guild) {
+            await guild.commands.set(comandosParaRegistrar);
+            console.log(`✅ Comandos Slash registrados en el servidor: ${guild.name}`);
+        }
+
+        // También registrar globalmente (tarda 1 hora pero sirve de respaldo)
         await client.application.commands.set(comandosParaRegistrar);
-        console.log("✅ Comandos Slash (/) registrados/actualizados en Discord.");
+        
     } catch (error) {
         console.error("❌ Error al registrar comandos:", error);
     }
