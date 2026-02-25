@@ -5,6 +5,7 @@ const path = require('path');
 const moment = require('moment');
 const cron = require('node-cron');
 const transcripts = require('discord-html-transcripts'); 
+const otplib = require('otplib'); // <--- AGREGADO PARA 2FA
 const config = require('./DataBaseJson/config.json');
 
 moment.locale('es');
@@ -60,7 +61,6 @@ const enviarLog = (embed) => {
 client.on('interactionCreate', async (interaction) => {
     // --- LÓGICA DE COMANDOS ---
     if (interaction.isCommand()) {
-        // Comando especial /renvembed
         if (interaction.commandName === "renvembed") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
                 return interaction.reply({ content: "❌ No tienes el rango necesario para usar este comando.", ephemeral: true });
@@ -114,6 +114,20 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
+        // --- NUEVA LÓGICA 2FA (BOTÓN) ---
+        if (customId === "ingresar_clave_2fa") {
+            const modal2fa = new Modal().setCustomId('modal_generar_2fa').setTitle('Generador de Código 2FA');
+            const inputClave = new TextInputComponent()
+                .setCustomId('clave_secreta')
+                .setLabel("Introduce tu Clave Secreta (Secret Key)")
+                .setPlaceholder("Ej: JBSWY3DPEHPK3PXP")
+                .setStyle('SHORT')
+                .setRequired(true);
+            modal2fa.addComponents(new MessageActionRow().addComponents(inputClave));
+            return await interaction.showModal(modal2fa);
+        }
+        // -------------------------------
+
         if (customId === "partner_rol") {
             const rolPartnerId = "1470862847671140412"; 
             const rol = interaction.guild.roles.cache.get(rolPartnerId);
@@ -182,6 +196,25 @@ client.on('interactionCreate', async (interaction) => {
 
     // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
+
+        // --- NUEVA LÓGICA 2FA (PROCESAMIENTO) ---
+        if (interaction.customId === 'modal_generar_2fa') {
+            const secret = interaction.fields.getTextInputValue('clave_secreta').replace(/\s/g, '');
+            try {
+                const token = otplib.authenticator.generate(secret);
+                return interaction.reply({ 
+                    content: `🔑 Tu código Rockstar 2FA actual es: **${token}**\n*(Expira en 30 segundos)*`, 
+                    ephemeral: true 
+                });
+            } catch (err) {
+                return interaction.reply({ 
+                    content: "❌ La clave secreta introducida no es válida. Asegúrate de que sea una clave base32 correcta.", 
+                    ephemeral: true 
+                });
+            }
+        }
+        // ----------------------------------------
+
         if (interaction.customId === 'modal_embed_personalizado') {
             const titulo = interaction.fields.getTextInputValue('titulo');
             const desc = interaction.fields.getTextInputValue('desc');
@@ -273,59 +306,63 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
-        await interaction.deferReply({ ephemeral: true });
-        let cateId, tipoTicket, nombreCanal, camposExtra = [];
-        if (interaction.customId === 'modal_compra') {
-            cateId = CATEGORIAS.COMPRA; tipoTicket = "Compra"; nombreCanal = `🛒-buy-${interaction.user.username}`;
-            camposExtra = [
-                { name: '📦 Producto', value: `\`${interaction.fields.getTextInputValue('p_prod')}\``, inline: true },
-                { name: '💳 Método', value: `\`${interaction.fields.getTextInputValue('p_metodo')}\``, inline: true }
-            ];
-        } else if (interaction.customId === 'modal_soporte') {
-            cateId = CATEGORIAS.SOPORTE; tipoTicket = "Soporte"; nombreCanal = `🛠️-soporte-${interaction.user.username}`;
-            camposExtra = [{ name: '❓ Ayuda', value: `\`${interaction.fields.getTextInputValue('p_duda')}\``, inline: false }];
-        } else if (interaction.customId === 'modal_partner') {
-            cateId = CATEGORIAS.PARTNER; tipoTicket = "Partner"; nombreCanal = `🤝-partner-${interaction.user.username}`;
-            camposExtra = [{ name: '🔗 Link', value: `\`${interaction.fields.getTextInputValue('p_link')}\``, inline: false }];
+        // LÓGICA DE CREACIÓN DE TICKETS (COMPRA/SOPORTE/PARTNER)
+        if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(interaction.customId)) {
+            await interaction.deferReply({ ephemeral: true });
+            let cateId, tipoTicket, nombreCanal, camposExtra = [];
+            
+            if (interaction.customId === 'modal_compra') {
+                cateId = CATEGORIAS.COMPRA; tipoTicket = "Compra"; nombreCanal = `🛒-buy-${interaction.user.username}`;
+                camposExtra = [
+                    { name: '📦 Producto', value: `\`${interaction.fields.getTextInputValue('p_prod')}\``, inline: true },
+                    { name: '💳 Método', value: `\`${interaction.fields.getTextInputValue('p_metodo')}\``, inline: true }
+                ];
+            } else if (interaction.customId === 'modal_soporte') {
+                cateId = CATEGORIAS.SOPORTE; tipoTicket = "Soporte"; nombreCanal = `🛠️-soporte-${interaction.user.username}`;
+                camposExtra = [{ name: '❓ Ayuda', value: `\`${interaction.fields.getTextInputValue('p_duda')}\``, inline: false }];
+            } else if (interaction.customId === 'modal_partner') {
+                cateId = CATEGORIAS.PARTNER; tipoTicket = "Partner"; nombreCanal = `🤝-partner-${interaction.user.username}`;
+                camposExtra = [{ name: '🔗 Link', value: `\`${interaction.fields.getTextInputValue('p_link')}\``, inline: false }];
+            }
+
+            try {
+                const canal = await interaction.guild.channels.create(nombreCanal, {
+                    type: 'GUILD_TEXT', parent: cateId,
+                    permissionOverwrites: [
+                        { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
+                        { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
+                        { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
+                    ]
+                });
+
+                const ticketID = Math.floor(Math.random() * 9000000000) + 1000000000;
+                const embedTicket = new MessageEmbed()
+                    .setColor('#3b5998')
+                    .setAuthor({ name: '710 Bot Shop', iconURL: interaction.guild.iconURL() })
+                    .setTitle('SISTEMA DE TICKETS')
+                    .setThumbnail(interaction.user.displayAvatarURL())
+                    .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
+                    .addFields(
+                        { name: 'Categoría', value: `\`${tipoTicket}\``, inline: true },
+                        { name: 'ID del Ticket', value: `\`${ticketID}\``, inline: true },
+                        { name: 'Fecha', value: `\`${moment().format('D/MM/YYYY HH:mm')}\``, inline: true },
+                        { name: 'Usuario', value: `\`${interaction.user.username}\` (${interaction.user.id})`, inline: false }
+                    )
+                    .addFields(camposExtra)
+                    .setFooter({ text: '710 Shop - Gestión de Tickets' })
+                    .setTimestamp();
+
+                const row = new MessageActionRow().addComponents(
+                    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
+                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                    new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
+                );
+
+                await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}> Staff 👥`, embeds: [embedTicket], components: [row] });
+                await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
+                enviarLog(new MessageEmbed().setTitle("🎫 Ticket Creado").setColor("BLUE").setDescription(`**Usuario:** ${interaction.user.tag}\n**Canal:** ${canal}\n**Tipo:** ${tipoTicket}`).setTimestamp());
+            } catch (e) { console.error(e); }
         }
-
-        try {
-            const canal = await interaction.guild.channels.create(nombreCanal, {
-                type: 'GUILD_TEXT', parent: cateId,
-                permissionOverwrites: [
-                    { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
-                    { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
-                    { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
-                ]
-            });
-
-            const ticketID = Math.floor(Math.random() * 9000000000) + 1000000000;
-            const embedTicket = new MessageEmbed()
-                .setColor('#3b5998')
-                .setAuthor({ name: '710 Bot Shop', iconURL: interaction.guild.iconURL() })
-                .setTitle('SISTEMA DE TICKETS')
-                .setThumbnail(interaction.user.displayAvatarURL())
-                .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
-                .addFields(
-                    { name: 'Categoría', value: `\`${tipoTicket}\``, inline: true },
-                    { name: 'ID del Ticket', value: `\`${ticketID}\``, inline: true },
-                    { name: 'Fecha', value: `\`${moment().format('D/MM/YYYY HH:mm')}\``, inline: true },
-                    { name: 'Usuario', value: `\`${interaction.user.username}\` (${interaction.user.id})`, inline: false }
-                )
-                .addFields(camposExtra)
-                .setFooter({ text: '710 Shop - Gestión de Tickets' })
-                .setTimestamp();
-
-            const row = new MessageActionRow().addComponents(
-                new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
-            );
-
-            await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}> Staff 👥`, embeds: [embedTicket], components: [row] });
-            await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
-            enviarLog(new MessageEmbed().setTitle("🎫 Ticket Creado").setColor("BLUE").setDescription(`**Usuario:** ${interaction.user.tag}\n**Canal:** ${canal}\n**Tipo:** ${tipoTicket}`).setTimestamp());
-        } catch (e) { console.error(e); }
     }
 });
 
