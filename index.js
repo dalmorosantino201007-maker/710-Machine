@@ -481,31 +481,42 @@ client.on('guildMemberRemove', m => {
 client.on('ready', async () => { 
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
 
-    // --- AGREGADO: REGISTRO AUTOMÁTICO DE COMANDOS (MODIFICADO PARA FUNCIONAR) ---
     try {
-        // Filtrar y convertir a JSON para evitar errores de API
+        // 1. Cargamos comandos desde la carpeta de comandos (handler)
         const comandosParaRegistrar = client.slashCommands
             .filter(cmd => cmd.data) 
             .map(cmd => cmd.data.toJSON());
         
+        // 2. AGREGAMOS MANUALMENTE los comandos que están definidos en el index.js
+        comandosParaRegistrar.push(
+            { 
+                name: 'renvembed', 
+                description: 'Reenvía el último mensaje del bot y borra el viejo' 
+            },
+            { 
+                name: 'clearpanel', 
+                description: 'Muestra el panel para limpiar tus mensajes directos' 
+            },
+            { 
+                name: 'comandlist', 
+                description: 'Muestra la lista de comandos y sus permisos' 
+            }
+        );
+
         console.log(`🔎 Cargando ${comandosParaRegistrar.length} comandos slash...`);
 
-        // Registrar en el servidor específico para que sea INSTANTÁNEO
         const guildId = '1469595804598501396'; 
         const guild = client.guilds.cache.get(guildId);
         
         if (guild) {
+            // Esto sobrescribe la lista actual de comandos en el servidor con la lista completa
             await guild.commands.set(comandosParaRegistrar);
             console.log(`✅ Comandos Slash registrados en el servidor: ${guild.name}`);
         }
-
-        // También registrar globalmente (tarda 1 hora pero sirve de respaldo)
-        await client.application.commands.set(comandosParaRegistrar);
         
     } catch (error) {
         console.error("❌ Error al registrar comandos:", error);
     }
-    // ------------------------------------------------
     
     const embedReady = new MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
