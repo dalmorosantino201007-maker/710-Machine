@@ -157,7 +157,6 @@ client.on('interactionCreate', async (interaction) => {
             if (thumb && thumb.startsWith('http')) embedFinal.setThumbnail(thumb);
             if (banner && banner.startsWith('http')) embedFinal.setImage(banner);
 
-            // BOTÓN DE COMPRA (He puesto el link de tu canal de compras según tus IDs anteriores)
             const rowCompra = new MessageActionRow().addComponents(
                 new MessageButton()
                     .setLabel('🛒 Compra Aqui / Buy Here')
@@ -166,6 +165,7 @@ client.on('interactionCreate', async (interaction) => {
             );
 
             await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
+            // RESPUESTA OBLIGATORIA PARA EVITAR EL ERROR "LA APLICACIÓN NO RESPONDE"
             return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
         }
 
@@ -305,8 +305,10 @@ client.on('messageDelete', m => {
 });
 
 client.on('messageUpdate', (o, n) => {
-    if (o.author?.bot || o.content === n.content) return;
-    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content}\`\`\`` }).setTimestamp());
+    // FIX DE SEGURIDAD: SI EL MENSAJE NO ESTÁ EN CACHÉ O NO TIENE AUTOR, SE IGNORA PARA QUE NO CRASHEE
+    if (!o.author || o.author.bot || o.content === n.content) return;
+    
+    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content || "Sin contenido"}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content || "Sin contenido"}\`\`\`` }).setTimestamp());
 });
 
 client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("GREEN").setDescription(`**Nombre:** ${c.name}\n**Tipo:** ${c.type}`).setTimestamp()));
