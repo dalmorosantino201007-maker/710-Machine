@@ -141,6 +141,34 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     if (interaction.isModalSubmit()) {
+        // --- 🔥 LÓGICA PARA RECIBIR EL MODAL DEL EMBED ---
+        if (interaction.customId === 'modal_embed_personalizado') {
+            const titulo = interaction.fields.getTextInputValue('titulo');
+            const desc = interaction.fields.getTextInputValue('desc');
+            const thumb = interaction.fields.getTextInputValue('thumbnail');
+            const banner = interaction.fields.getTextInputValue('banner');
+            const color = interaction.fields.getTextInputValue('cor');
+
+            const embedFinal = new MessageEmbed()
+                .setDescription(desc)
+                .setColor(color.startsWith('#') ? color : `#${color}`);
+
+            if (titulo) embedFinal.setTitle(titulo);
+            if (thumb && thumb.startsWith('http')) embedFinal.setThumbnail(thumb);
+            if (banner && banner.startsWith('http')) embedFinal.setImage(banner);
+
+            // BOTÓN DE COMPRA (He puesto el link de tu canal de compras según tus IDs anteriores)
+            const rowCompra = new MessageActionRow().addComponents(
+                new MessageButton()
+                    .setLabel('🛒 Compra Aqui / Buy Here')
+                    .setStyle('LINK')
+                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352') 
+            );
+
+            await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
+            return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
+        }
+
         if (interaction.customId === 'modal_nota_cierre') {
             await interaction.deferReply({ ephemeral: true });
             const notaStaff = interaction.fields.getTextInputValue('nota_staff') || "No se proporcionaron notas adicionales.";
