@@ -100,6 +100,18 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
+        // --- LÓGICA PARA REENVIAR EL EMBED ---
+        if (customId === "reenviar_embed") {
+            const embedOriginal = interaction.message.embeds[0];
+            if (!embedOriginal) return interaction.reply({ content: "❌ Error: No se encontró el contenido.", ephemeral: true });
+
+            await interaction.channel.send({ 
+                embeds: [embedOriginal], 
+                components: interaction.message.components 
+            });
+            return interaction.reply({ content: "✅ Embed reenviado.", ephemeral: true });
+        }
+
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
@@ -168,14 +180,19 @@ client.on('interactionCreate', async (interaction) => {
             if (thumb && thumb.startsWith('http')) embedFinal.setThumbnail(thumb);
             if (banner && banner.startsWith('http')) embedFinal.setImage(banner);
 
-            const rowCompra = new MessageActionRow().addComponents(
+            // --- FILA DE BOTONES ACTUALIZADA ---
+            const rowAcciones = new MessageActionRow().addComponents(
                 new MessageButton()
                     .setLabel('🛒 Compra Aqui / Buy Here')
                     .setStyle('LINK')
-                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352') 
+                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352'),
+                new MessageButton()
+                    .setCustomId('reenviar_embed')
+                    .setLabel('🔄 Volver a enviar')
+                    .setStyle('SECONDARY')
             );
 
-            await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
+            await interaction.channel.send({ embeds: [embedFinal], components: [rowAcciones] });
             return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
         }
 
