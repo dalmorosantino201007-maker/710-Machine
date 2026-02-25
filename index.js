@@ -481,6 +481,19 @@ client.on('guildMemberRemove', m => {
 // --- 🚀 EVENTO READY (INICIO) ---
 client.on('ready', async () => { 
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
+
+    // --- AGREGADO: REGISTRO AUTOMÁTICO DE COMANDOS ---
+    try {
+        // Obtenemos los comandos que cargó el handler
+        const comandosParaRegistrar = client.slashCommands.map(cmd => cmd.data);
+        
+        // Registramos los comandos en la API de Discord
+        await client.application.commands.set(comandosParaRegistrar);
+        console.log("✅ Comandos Slash (/) registrados/actualizados en Discord.");
+    } catch (error) {
+        console.error("❌ Error al registrar comandos:", error);
+    }
+    // ------------------------------------------------
     
     const embedReady = new MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
