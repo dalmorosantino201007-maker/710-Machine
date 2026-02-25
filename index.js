@@ -433,6 +433,7 @@ client.on('messageDelete', m => {
 });
 
 client.on('messageUpdate', (o, n) => {
+    // CORRECCIÓN: Comprobación de seguridad para mensajes antiguos no cacheados
     if (!o || !o.author || o.author.bot || o.content === n.content) return;
 
     enviarLog(new MessageEmbed()
@@ -440,8 +441,8 @@ client.on('messageUpdate', (o, n) => {
         .setColor("#ffff00")
         .addFields(
             { name: "Autor", value: `${o.author.tag}`, inline: true }, 
-            { name: "Antes", value: `\`\`\`${o.content || "Sin contenido previo"}\`\`\`` }, 
-            { name: "Después", value: `\`\`\`${n.content || "Sin contenido"}\`\`\`` }
+            { name: "Antes", value: `\`\`\`${o.content.slice(0, 1000) || "Sin contenido previo"}\`\`\`` }, 
+            { name: "Después", value: `\`\`\`${n.content.slice(0, 1000) || "Sin contenido"}\`\`\`` }
         )
         .setTimestamp()
     );
@@ -487,30 +488,34 @@ client.on('ready', async () => {
             .filter(cmd => cmd.data) 
             .map(cmd => cmd.data.toJSON());
         
-        // 2. AGREGAMOS MANUALMENTE los comandos que están definidos en el index.js
-        comandosParaRegistrar.push(
+        // 2. CORRECCIÓN: Agregar comandos manuales con propiedad 'type' para evitar error de API
+        const comandosManuales = [
             { 
                 name: 'renvembed', 
-                description: 'Reenvía el último mensaje del bot y borra el viejo' 
+                description: 'Reenvía el último mensaje del bot y borra el viejo',
+                type: 'CHAT_INPUT'
             },
             { 
                 name: 'clearpanel', 
-                description: 'Muestra el panel para limpiar tus mensajes directos' 
+                description: 'Muestra el panel para limpiar tus mensajes directos',
+                type: 'CHAT_INPUT'
             },
             { 
-                name: 'comandlist', 
-                description: 'Muestra la lista de comandos y sus permisos' 
+                name: 'comandlist',
+                description: 'Muestra la lista de comandos y sus permisos',
+                type: 'CHAT_INPUT'
             }
-        );
+        ];
 
-        console.log(`🔎 Cargando ${comandosParaRegistrar.length} comandos slash...`);
+        const listaFinal = [...comandosParaRegistrar, ...comandosManuales];
 
-        const guildId = '1469595804598501396'; 
+        console.log(`🔎 Cargando ${listaFinal.length} comandos slash...`);
+
+        const guildId = '1469618754282586154';
         const guild = client.guilds.cache.get(guildId);
         
         if (guild) {
-            // Esto sobrescribe la lista actual de comandos en el servidor con la lista completa
-            await guild.commands.set(comandosParaRegistrar);
+            await guild.commands.set(listaFinal);
             console.log(`✅ Comandos Slash registrados en el servidor: ${guild.name}`);
         }
         
