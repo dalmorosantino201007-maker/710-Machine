@@ -85,6 +85,42 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
+        // --- NUEVO: COMANDO /CLEARPANEL ---
+        if (interaction.commandName === "clearpanel") {
+            const embedClear = new MessageEmbed()
+                .setTitle("🧹 Limpieza de Mensajes Directos")
+                .setColor("#f39c12")
+                .setDescription("¿Quieres limpiar todos los mensajes del bot en tus DMs?\n\n⚠️ **IMPORTANTE:** El bot solo puede borrar sus propios mensajes, no los tuyos.")
+                .addFields({ name: "Acción", value: "Presiona el botón de abajo para empezar la limpieza automática." })
+                .setFooter({ text: "Host | Machine Services" });
+
+            const rowClear = new MessageActionRow().addComponents(
+                new MessageButton()
+                    .setCustomId("limpiar_dm_proceso")
+                    .setLabel("Limpiar DM")
+                    .setStyle("DANGER")
+                    .setEmoji("🧹")
+            );
+
+            return interaction.reply({ embeds: [embedClear], components: [rowClear] });
+        }
+
+        // --- NUEVO: COMANDO /COMANDLIST ---
+        if (interaction.commandName === "comandlist") {
+            const embedList = new MessageEmbed()
+                .setTitle("📜 Lista de Comandos - Host | Machine")
+                .setColor("#2f3136")
+                .setDescription("Aquí tienes la lista completa de comandos y sus permisos:")
+                .addFields(
+                    { name: "`/renvembed`", value: `Reenvía el último mensaje del bot.\nPermiso: <@&${rolAdminReenvio}>`, inline: false },
+                    { name: "`/clearpanel`", value: "Abre el panel de limpieza de DM.\nPermiso: `@everyone`", inline: false },
+                    { name: "`/comandlist`", value: "Muestra esta lista de ayuda.\nPermiso: `@everyone`", inline: false }
+                )
+                .setTimestamp();
+
+            return interaction.reply({ embeds: [embedList], ephemeral: true });
+        }
+
         const cmd = client.slashCommands.get(interaction.commandName);
         if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
@@ -114,7 +150,26 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
-        // --- NUEVA LÓGICA 2FA (BOTÓN) ---
+        // --- NUEVO: LÓGICA DE LIMPIEZA DE DM ---
+        if (customId === "limpiar_dm_proceso") {
+            await interaction.reply({ content: "⏳ Iniciando limpieza de mis mensajes en tus DMs...", ephemeral: true });
+            try {
+                const dmChannel = await user.createDM();
+                const mensajes = await dmChannel.messages.fetch({ limit: 100 });
+                const mensajesBot = mensajes.filter(m => m.author.id === client.user.id);
+                
+                if (mensajesBot.size === 0) return interaction.editReply({ content: "✅ No encontré mensajes míos para borrar." });
+
+                for (const msg of mensajesBot.values()) {
+                    await msg.delete().catch(() => {});
+                }
+                return interaction.editReply({ content: `✅ Limpieza completada. Se han eliminado ${mensajesBot.size} mensajes.` });
+            } catch (error) {
+                return interaction.editReply({ content: "❌ No pude acceder a tus DMs. Asegúrate de tenerlos abiertos para miembros del servidor." });
+            }
+        }
+
+        // --- LÓGICA 2FA (BOTÓN) ---
         if (customId === "ingresar_clave_2fa") {
             const modal2fa = new Modal().setCustomId('modal_generar_2fa').setTitle('Generador de Código 2FA');
             const inputClave = new TextInputComponent()
@@ -126,7 +181,6 @@ client.on('interactionCreate', async (interaction) => {
             modal2fa.addComponents(new MessageActionRow().addComponents(inputClave));
             return await interaction.showModal(modal2fa);
         }
-        // -------------------------------
 
         if (customId === "partner_rol") {
             const rolPartnerId = "1470862847671140412"; 
@@ -197,7 +251,7 @@ client.on('interactionCreate', async (interaction) => {
     // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
 
-        // --- NUEVA LÓGICA 2FA (PROCESAMIENTO) ---
+        // --- LÓGICA 2FA (PROCESAMIENTO) ---
         if (interaction.customId === 'modal_generar_2fa') {
             const secret = interaction.fields.getTextInputValue('clave_secreta').replace(/\s/g, '');
             try {
@@ -213,7 +267,6 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
         }
-        // ----------------------------------------
 
         if (interaction.customId === 'modal_embed_personalizado') {
             const titulo = interaction.fields.getTextInputValue('titulo');
@@ -306,7 +359,6 @@ client.on('interactionCreate', async (interaction) => {
             return;
         }
 
-        // LÓGICA DE CREACIÓN DE TICKETS (COMPRA/SOPORTE/PARTNER)
         if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(interaction.customId)) {
             await interaction.deferReply({ ephemeral: true });
             let cateId, tipoTicket, nombreCanal, camposExtra = [];
@@ -377,12 +429,23 @@ client.on('messageCreate', m => {
 
 client.on('messageDelete', m => {
     if (!m.guild || m.author?.bot) return;
-    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("#ff0000").addFields({ name: "Autor", value: `${m.author.tag}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: `\`\`\`${m.content || "Sin texto"}\`\`\`` }).setTimestamp());
+    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("#ff0000").addFields({ name: "Autor", value: `${m.author?.tag || "Desconocido"}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: `\`\`\`${m.content || "Sin texto"}\`\`\`` }).setTimestamp());
 });
 
 client.on('messageUpdate', (o, n) => {
-    if (!o.author || o.author.bot || o.content === n.content) return;
-    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("#ffff00").addFields({ name: "Autor", value: `${o.author.tag}`, inline: true }, { name: "Antes", value: `\`\`\`${o.content || "Sin contenido"}\`\`\`` }, { name: "Después", value: `\`\`\`${n.content || "Sin contenido"}\`\`\`` }).setTimestamp());
+    // CORRECCIÓN PARA EVITAR CRASHEO
+    if (!o || !o.author || o.author.bot || o.content === n.content) return;
+
+    enviarLog(new MessageEmbed()
+        .setTitle("✏️ Mensaje Editado")
+        .setColor("#ffff00")
+        .addFields(
+            { name: "Autor", value: `${o.author.tag}`, inline: true }, 
+            { name: "Antes", value: `\`\`\`${o.content || "Sin contenido previo"}\`\`\`` }, 
+            { name: "Después", value: `\`\`\`${n.content || "Sin contenido"}\`\`\`` }
+        )
+        .setTimestamp()
+    );
 });
 
 client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setColor("GREEN").setDescription(`**Nombre:** ${c.name}\n**Tipo:** ${c.type}`).setTimestamp()));
