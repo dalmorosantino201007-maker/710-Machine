@@ -33,6 +33,7 @@ const rolPermitidoId = "1469967630365622403";
 const canalLogsId = "1470928427199631412"; 
 const canalTranscriptsId = "1473454832567320768"; 
 const canalReviewsId = "1475613791252119684";     
+const rolAdminReenvio = "1469618981781373042"; // Rol para /renvembed
 
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
@@ -53,16 +54,43 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 🕹️ LÓGICA DE INTERACCIONES (TICKETS)
+// 🕹️ LÓGICA DE INTERACCIONES (TICKETS Y COMANDOS)
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
+    // --- LÓGICA DE COMANDOS ---
     if (interaction.isCommand()) {
+        // Comando especial /renvembed
+        if (interaction.commandName === "renvembed") {
+            if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
+                return interaction.reply({ content: "❌ No tienes el rango necesario para usar este comando.", ephemeral: true });
+            }
+
+            const mensajes = await interaction.channel.messages.fetch({ limit: 50 });
+            const ultimoEmbed = mensajes.find(m => m.author.id === client.user.id && m.embeds.length > 0);
+
+            if (!ultimoEmbed) {
+                return interaction.reply({ content: "❌ No se encontró ningún embed reciente enviado por el bot.", ephemeral: true });
+            }
+
+            try {
+                await interaction.channel.send({
+                    embeds: ultimoEmbed.embeds,
+                    components: ultimoEmbed.components
+                });
+                await ultimoEmbed.delete().catch(() => {});
+                return interaction.reply({ content: "✅ Embed reenviado y anterior eliminado.", ephemeral: true });
+            } catch (error) {
+                return interaction.reply({ content: "❌ Error al intentar reenviar el embed.", ephemeral: true });
+            }
+        }
+
         const cmd = client.slashCommands.get(interaction.commandName);
         if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
     }
 
+    // --- LÓGICA DE MENÚS ---
     if (interaction.isSelectMenu() && interaction.customId.startsWith("calificar_staff_")) {
         const staffId = interaction.customId.split('_')[2];
         const nota = interaction.values[0];
@@ -82,10 +110,10 @@ client.on('interactionCreate', async (interaction) => {
         return interaction.reply({ content: `✅ ¡Gracias! Has calificado la atención con ${nota} estrellas.`, ephemeral: true });
     }
 
+    // --- LÓGICA DE BOTONES ---
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
-        // --- LÓGICA PARA EL BOTÓN DE ROL PARTNER (NUEVO) ---
         if (customId === "partner_rol") {
             const rolPartnerId = "1470862847671140412"; 
             const rol = interaction.guild.roles.cache.get(rolPartnerId);
@@ -98,18 +126,6 @@ client.on('interactionCreate', async (interaction) => {
                 await member.roles.add(rolPartnerId);
                 return interaction.reply({ content: "✅ ¡Perfecto! Ahora tienes el rol de **Partner**.", ephemeral: true });
             }
-        }
-
-        // --- LÓGICA PARA REENVIAR EL EMBED ---
-        if (customId === "reenviar_embed") {
-            const embedOriginal = interaction.message.embeds[0];
-            if (!embedOriginal) return interaction.reply({ content: "❌ Error: No se encontró el contenido.", ephemeral: true });
-
-            await interaction.channel.send({ 
-                embeds: [embedOriginal], 
-                components: interaction.message.components 
-            });
-            return interaction.reply({ content: "✅ Embed reenviado.", ephemeral: true });
         }
 
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
@@ -164,6 +180,7 @@ client.on('interactionCreate', async (interaction) => {
         }
     }
 
+    // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
         if (interaction.customId === 'modal_embed_personalizado') {
             const titulo = interaction.fields.getTextInputValue('titulo');
@@ -180,19 +197,14 @@ client.on('interactionCreate', async (interaction) => {
             if (thumb && thumb.startsWith('http')) embedFinal.setThumbnail(thumb);
             if (banner && banner.startsWith('http')) embedFinal.setImage(banner);
 
-            // --- FILA DE BOTONES ACTUALIZADA ---
-            const rowAcciones = new MessageActionRow().addComponents(
+            const rowCompra = new MessageActionRow().addComponents(
                 new MessageButton()
                     .setLabel('🛒 Compra Aqui / Buy Here')
                     .setStyle('LINK')
-                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352'),
-                new MessageButton()
-                    .setCustomId('reenviar_embed')
-                    .setLabel('🔄 Volver a enviar')
-                    .setStyle('SECONDARY')
+                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352') 
             );
 
-            await interaction.channel.send({ embeds: [embedFinal], components: [rowAcciones] });
+            await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
             return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
         }
 
