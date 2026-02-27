@@ -21,6 +21,22 @@ if (!fs.existsSync(contadorPath)) {
     fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }, null, 2));
 }
 
+// --- 🏆 SISTEMA DE RANKING STAFF (NUEVO) ---
+const rankingPath = './DataBaseJson/ranking.json';
+if (!fs.existsSync(rankingPath)) {
+    fs.writeFileSync(rankingPath, JSON.stringify({}, null, 2));
+}
+
+function updateRanking(userId, userTag) {
+    let ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
+    if (!ranking[userId]) {
+        ranking[userId] = { tag: userTag, tickets: 0 };
+    }
+    ranking[userId].tickets += 1;
+    ranking[userId].tag = userTag; // Mantener tag actualizado
+    fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
+}
+
 cron.schedule('0 0 * * *', () => {
     fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }, null, 2));
     console.log("✅ Contador diario reiniciado.");
@@ -114,11 +130,46 @@ client.on('interactionCreate', async (interaction) => {
                 .addFields(
                     { name: "`/renvembed`", value: `Reenvía el último mensaje del bot.\nPermiso: <@&${rolAdminReenvio}>`, inline: false },
                     { name: "`/clearpanel`", value: "Abre el panel de limpieza de DM.\nPermiso: `@everyone`", inline: false },
-                    { name: "`/comandlist`", value: "Muestra esta lista de ayuda.\nPermiso: `@everyone`", inline: false }
+                    { name: "`/comandlist`", value: "Muestra esta lista de ayuda.\nPermiso: `@everyone`", inline: false },
+                    { name: "`/rankingstaff`", value: "Muestra el top de Staff con más tickets asumidos.\nPermiso: `@everyone` Explorar", inline: false }
                 )
                 .setTimestamp();
 
             return interaction.reply({ embeds: [embedList], ephemeral: true });
+        }
+
+        // --- NUEVO: COMANDO /RANKINGSTAFF ---
+        if (interaction.commandName === "rankingstaff") {
+            const ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
+            const sorted = Object.entries(ranking)
+                .sort(([, a], [, b]) => b.tickets - a.tickets)
+                .slice(0, 10);
+
+            if (sorted.length === 0) {
+                return interaction.reply({ content: "📭 Aún no hay registros en el ranking.", ephemeral: true });
+            }
+
+            const description = sorted.map(([id, data], index) => {
+                return `**${index + 1}.** <@${id}> — \`${data.tickets}\` tickets`;
+            }).join('\n');
+
+            const embedRank = new MessageEmbed()
+                .setTitle("🏆 Ranking de Staff - Tickets Asumidos")
+                .setColor("GOLD")
+                .setDescription(description)
+                .setTimestamp()
+                .setFooter({ text: "Host | Machine Ranking" });
+
+            return interaction.reply({ embeds: [embedRank] });
+        }
+
+        // --- NUEVO: COMANDO /RANKINGRESET ---
+        if (interaction.commandName === "rankingreset") {
+            if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
+                return interaction.reply({ content: "❌ No tienes el rango necesario para resetear el ranking.", ephemeral: true });
+            }
+            fs.writeFileSync(rankingPath, JSON.stringify({}, null, 2));
+            return interaction.reply({ content: "✅ El ranking de Staff ha sido reseteado a 0 correctamente." });
         }
 
         const cmd = client.slashCommands.get(interaction.commandName);
@@ -199,11 +250,30 @@ client.on('interactionCreate', async (interaction) => {
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
+        // --- LÓGICA ASUMIR TICKET CON LOGS ---
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+            
+            // ACTUALIZACIÓN DE RANKING
+            updateRanking(user.id, user.tag);
+
             await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
             await channel.setName(`atendido-${user.username}`).catch(() => {});
-            enviarLog(new MessageEmbed().setTitle("📌 Ticket Asumido").setDescription(`**Staff:** ${user.tag}\n**Canal:** ${channel}`).setColor("PURPLE").setTimestamp());
+            
+            // Enviar log detallado al canal de logs
+            const embedAsumir = new MessageEmbed()
+                .setTitle("📌 Ticket Asumido")
+                .setColor("PURPLE")
+                .setDescription(`Un miembro del staff ha tomado el control de un ticket.`)
+                .addFields(
+                    { name: "👷 Staff", value: `${user.tag} (${user.id})`, inline: true },
+                    { name: "🎫 Ticket", value: `${channel.name}`, inline: true },
+                    { name: "🔗 Canal", value: `${channel}`, inline: false }
+                )
+                .setTimestamp()
+                .setFooter({ text: "Host | Machine Logs" });
+
+            enviarLog(embedAsumir);
         }
 
         if (customId === "notificar") {
@@ -433,7 +503,6 @@ client.on('messageDelete', m => {
 });
 
 client.on('messageUpdate', (o, n) => {
-    // CORRECCIÓN: Comprobación de seguridad para mensajes antiguos no cacheados
     if (!o || !o.author || o.author.bot || o.content === n.content) return;
 
     enviarLog(new MessageEmbed()
@@ -483,12 +552,10 @@ client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
 
     try {
-        // 1. Cargamos comandos desde la carpeta de comandos (handler)
         const comandosParaRegistrar = client.slashCommands
             .filter(cmd => cmd.data) 
             .map(cmd => cmd.data.toJSON());
         
-        // 2. CORRECCIÓN: Agregar comandos manuales con propiedad 'type' para evitar error de API
         const comandosManuales = [
             { 
                 name: 'renvembed', 
@@ -504,12 +571,20 @@ client.on('ready', async () => {
                 name: 'comandlist',
                 description: 'Muestra la lista de comandos y sus permisos',
                 type: 'CHAT_INPUT'
+            },
+            { 
+                name: 'rankingstaff',
+                description: 'Muestra el top de Staff con más tickets asumidos',
+                type: 'CHAT_INPUT'
+            },
+            { 
+                name: 'rankingreset',
+                description: 'Resetea el ranking de Staff (Solo Admins)',
+                type: 'CHAT_INPUT'
             }
         ];
 
         const listaFinal = [...comandosParaRegistrar, ...comandosManuales];
-
-        console.log(`🔎 Cargando ${listaFinal.length} comandos slash...`);
 
         const guildId = '1469618754282586154';
         const guild = client.guilds.cache.get(guildId);
