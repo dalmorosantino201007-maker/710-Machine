@@ -632,7 +632,7 @@ client.on('ready', async () => {
     
     // --- LOG DE ENCENDIDO ---
     // Nota: Si usas discord.js v13, asegúrate de tener definida la variable Discord o usa MessageEmbed directamente
-    const embedReady = new Discord.MessageEmbed()
+    const embedReady = new MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
         .setColor("GREEN")
         .setDescription(`El bot **${client.user.tag}** ya está operativo.`)
