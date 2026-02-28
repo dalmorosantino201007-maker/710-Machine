@@ -19,7 +19,7 @@ module.exports = {
   ],
 
   run: async (client, interaction) => {
-    // 1. Evitamos errores de tiempo de respuesta
+    // 1. Evitamos errores de tiempo de respuesta (Unknown Interaction)
     await interaction.deferReply({ ephemeral: true });
 
     try {
@@ -38,23 +38,30 @@ module.exports = {
 
       // 4. Lógica de Cambio de Apodo (Nickname)
       try {
-          // Limpiamos el nombre del rol de símbolos extra si los tiene (opcional)
-          const nombreRolLimpio = role.name.replace(/[.·|]/g, '').trim(); 
+          // --- ESTA ES LA PARTE QUE MODIFICAMOS ---
+          // Borra ".gg/710shop", los puntos extra y los símbolos raros
+          const nombreRolLimpio = role.name
+            .replace(".gg/710shop", "") // Quita el link
+            .replace(/[.·|]/g, '')      // Quita puntos y barras
+            .trim();                    // Quita espacios sobrantes
+
           const nombreBase = targetUser.user.username;
           
-          // Formato: "Rol | Nombre" (Cortado a 32 caracteres máximo por límite de Discord)
+          // Formato: "Rol | Nombre" (Ej: Customer | Santino)
           const nuevoApodo = `${nombreRolLimpio} | ${nombreBase}`.slice(0, 32);
           
           await targetUser.setNickname(nuevoApodo);
       } catch (nickError) {
-          console.log("No se pudo cambiar el apodo (Jerarquía o permisos insuficientes).");
-          // No detenemos el proceso, ya que el rol sí se añadió.
+          console.log("No se pudo cambiar el apodo: El usuario es el dueño o tengo jerarquía baja.");
       }
 
-      // 5. Confirmación
+      // 5. Confirmación con Embed
       const embed = new Discord.MessageEmbed()
         .setTitle("✅ Acción Completada")
         .setDescription(`Se ha asignado el rol ${role} y actualizado el apodo de ${targetUser}.`)
+        .addFields(
+            { name: "Nuevo Apodo:", value: `\`${targetUser.nickname || targetUser.user.username}\``, inline: true }
+        )
         .setColor("GREEN")
         .setTimestamp();
 
