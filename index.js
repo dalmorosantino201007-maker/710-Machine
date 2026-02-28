@@ -95,19 +95,30 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isCommand()) {
         const { commandName } = interaction;
 
-        // NUEVO: Comando /mp (Para que no de error "no responde")
+        // Comando /mp MODIFICADO para mostrar todo directo
         if (commandName === "mp") {
-            const rowMenu = new MessageActionRow().addComponents(
-                new MessageSelectMenu()
-                    .setCustomId('menu_metodos')
-                    .setPlaceholder('💳 Elige tu método de pago')
-                    .addOptions([
-                        { label: 'Mercado Pago', value: 'pago_mp', emoji: '💳', description: 'Transferencias Argentina' },
-                        { label: 'PayPal', value: 'pago_paypal', emoji: '💙', description: 'la710storeshop@gmail.com' }
-                    ])
-            );
-            return await interaction.reply({ content: 'Selecciona una opción:', components: [rowMenu], ephemeral: true });
+            const embedPagos = new MessageEmbed()
+                .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
+                .setTitle("💳 INFORMACIÓN DE PAGOS")
+                .setColor("#5865F2") // Color azul Discord
+                .setDescription("Aquí tienes nuestros datos oficiales para realizar tus compras de forma segura.")
+                .addFields(
+                    { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
+                    { name: "💳 Mercado Pago", value: "\u200B", inline: false }, // Espaciador
+                    { name: "📌 CVU:", value: "```0000003100072461415651```", inline: true },
+                    { name: "🏷️ Alias:", value: "```710shop```", inline: true },
+                    { name: "👤 Titular:", value: "```Santino Dal Moro```", inline: true },
+                    { name: "🏦 Banco:", value: "```Mercado Pago```", inline: true }
+                )
+                .setFooter({ text: "⚠️ Envía el comprobante una vez realizada la transferencia.", iconURL: interaction.guild.iconURL() })
+                .setTimestamp();
+
+            // ephemeral: false permite que TODO EL MUNDO vea el mensaje en el canal
+            return await interaction.reply({ embeds: [embedPagos], ephemeral: false });
         }
+
+        // ... el resto de tus comandos (renvembed, clearpanel, etc.)
+    }
 
         if (commandName === "renvembed") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) return interaction.reply({ content: "❌ No tienes permisos.", ephemeral: true });
@@ -260,6 +271,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // --- 4. MODALES ---
+    // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
         const { customId, fields, guild, channel, user } = interaction;
 
@@ -285,16 +297,44 @@ client.on('interactionCreate', async (interaction) => {
             return setTimeout(() => channel.delete().catch(() => {}), 3000);
         }
 
-        // Creación de Tickets (Compra, Soporte, Partner)
+        // Creación de Tickets (Compra, Soporte, Partner) - MODIFICADO PARA DISEÑO PRO
         if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(customId)) {
             await interaction.deferReply({ ephemeral: true });
-            let cateId = CATEGORIAS.COMPRA, nombre = `🛒-buy-${user.username}`, desc = "Ticket de Compra";
             
-            if (customId === 'modal_soporte') { cateId = CATEGORIAS.SOPORTE; nombre = `🛠️-soporte-${user.username}`; desc = "Soporte"; }
-            if (customId === 'modal_partner') { cateId = CATEGORIAS.PARTNER; nombre = `🤝-partner-${user.username}`; desc = "Partner"; }
+            let cateId = CATEGORIAS.COMPRA;
+            let nombre = `🛒-buy-${user.username}`;
+            let tituloEmbed = "🛒 NUEVA ORDEN DE COMPRA";
+            let colorEmbed = "#57F287"; // Verde
+            let camposExtra = [];
+            
+            // Extraer datos según el modal
+            if (customId === 'modal_compra') {
+                const producto = fields.getTextInputValue('p_prod');
+                const metodo = fields.getTextInputValue('p_metodo');
+                const cantidad = fields.getTextInputValue('p_cant');
+                camposExtra = [
+                    { name: '📦 Producto:', value: `\`${producto}\``, inline: true },
+                    { name: '💳 Método:', value: `\`${metodo}\``, inline: true },
+                    { name: '🔢 Cantidad:', value: `\`${cantidad}\``, inline: true }
+                ];
+            } else if (customId === 'modal_soporte') {
+                cateId = CATEGORIAS.SOPORTE; 
+                nombre = `🛠️-soporte-${user.username}`; 
+                tituloEmbed = "🛠️ CENTRO DE SOPORTE";
+                colorEmbed = "#5865F2"; // Azul
+                camposExtra = [{ name: '❓ Consulta:', value: `\`${fields.getTextInputValue('p_duda')}\``, inline: false }];
+            } else if (customId === 'modal_partner') {
+                cateId = CATEGORIAS.PARTNER; 
+                nombre = `🤝-partner-${user.username}`; 
+                tituloEmbed = "🤝 SOLICITUD DE PARTNER";
+                colorEmbed = "#EB459E"; // Rosa
+                camposExtra = [{ name: '🔗 Link/Info:', value: `\`${fields.getTextInputValue('p_link')}\``, inline: false }];
+            }
 
+            // Crear el canal
             const nChannel = await guild.channels.create(nombre, {
-                type: 'GUILD_TEXT', parent: cateId,
+                type: 'GUILD_TEXT', 
+                parent: cateId,
                 permissionOverwrites: [
                     { id: guild.id, deny: ['VIEW_CHANNEL'] },
                     { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
@@ -302,18 +342,38 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
+            // DISEÑO DEL EMBED DE BIENVENIDA
+            const embedTicket = new MessageEmbed()
+                .setAuthor({ name: '710 | Machine Services', iconURL: client.user.displayAvatarURL() })
+                .setTitle(tituloEmbed)
+                .setColor(colorEmbed)
+                .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                .setDescription(`Hola ${user}, bienvenido a tu ticket.\n\n> Un miembro de nuestro **Staff** te atenderá en la brevedad posible. Por favor, ten paciencia y no realices spam.`)
+                .addFields(
+                    { name: "👤 Cliente:", value: `${user}`, inline: true },
+                    { name: "🆔 ID Usuario:", value: `\`${user.id}\``, inline: true },
+                    ...camposExtra
+                )
+                .setFooter({ text: "710 | Machine - Sistema de Gestión", iconURL: guild.iconURL() })
+                .setTimestamp();
+
+            // BOTONES
             const row = new MessageActionRow().addComponents(
-                new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS"),
-                new MessageButton().setCustomId("metodos_pago").setLabel("Pagos").setStyle("PRIMARY"),
-                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY")
+                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                new MessageButton().setCustomId("boton_pago_mp").setLabel("Pagos").setStyle("PRIMARY").setEmoji("💳"),
+                new MessageButton().setCustomId("notificar").setLabel("Avisar Staff").setStyle("SECONDARY").setEmoji("🔔"),
+                new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒")
             );
 
-            await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [new MessageEmbed().setTitle(desc).setDescription(`Hola ${user}, espera al staff.`)], components: [row] });
-            return interaction.editReply(`✅ Ticket creado: ${nChannel}`);
+            await nChannel.send({ 
+                content: `${user} | <@&${rolPermitidoId}>`, 
+                embeds: [embedTicket], 
+                components: [row] 
+            });
+
+            return interaction.editReply(`✅ Ticket creado con éxito: ${nChannel}`);
         }
     }
-});
 
 // --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
 
