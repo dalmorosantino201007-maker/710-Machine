@@ -584,12 +584,35 @@ client.on('guildMemberRemove', m => {
 });
 
 // --- 🚀 EVENTO READY (INICIO) ---
-client.on('ready', async () => { 
-    console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`); 
+client.on('ready', async () => {
+    console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`);
+
+    // --- BLOQUE DE CONEXIÓN A VOZ ---
+    const { joinVoiceChannel } = require('@discordjs/voice');
+    const ID_CANAL_VOZ = '1475258262692827354'; 
+    const ID_SERVIDOR = '1469618754282586154'; 
 
     try {
+        const canal = client.channels.cache.get(ID_CANAL_VOZ);
+        if (canal) {
+            joinVoiceChannel({
+                channelId: canal.id,
+                guildId: ID_SERVIDOR,
+                adapterCreator: canal.guild.voiceAdapterCreator,
+                selfDeaf: true, // Ensordecido
+                selfMute: false,
+            });
+            console.log(`🎙️ Bot conectado a voz en: ${canal.name}`);
+        }
+    } catch (error) {
+        console.error("❌ Error al conectar a voz:", error);
+    }
+    // --- FIN BLOQUE VOZ ---
+
+    // --- REGISTRO DE COMANDOS ---
+    try {
         const comandosParaRegistrar = client.slashCommands
-            .filter(cmd => cmd.data) 
+            .filter(cmd => cmd.data)
             .map(cmd => cmd.data.toJSON());
         
         const comandosManuales = [
@@ -601,8 +624,7 @@ client.on('ready', async () => {
         ];
 
         const listaFinal = [...comandosParaRegistrar, ...comandosManuales];
-        const guildId = '1469618754282586154';
-        const guild = client.guilds.cache.get(guildId);
+        const guild = client.guilds.cache.get(ID_SERVIDOR);
         
         if (guild) {
             await guild.commands.set(listaFinal);
@@ -613,7 +635,9 @@ client.on('ready', async () => {
         console.error("❌ Error al registrar comandos:", error);
     }
     
-    const embedReady = new MessageEmbed()
+    // --- LOG DE ENCENDIDO ---
+    // Nota: Si usas discord.js v13, asegúrate de tener definida la variable Discord o usa MessageEmbed directamente
+    const embedReady = new Discord.MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
         .setColor("GREEN")
         .setDescription(`El bot **${client.user.tag}** ya está operativo.`)
@@ -623,7 +647,10 @@ client.on('ready', async () => {
         )
         .setTimestamp();
     
-    enviarLog(embedReady);
+    // Solo envía el log si la función existe
+    if (typeof enviarLog === 'function') {
+        enviarLog(embedReady);
+    }
 });
 
 client.login(process.env.TOKEN || config.token);
