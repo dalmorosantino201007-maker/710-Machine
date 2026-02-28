@@ -2,7 +2,7 @@ const Discord = require("discord.js");
 const fs = require("fs");
 const path = require("path");
 
-// Asegúrate de que esta ruta sea exacta a la de tu addtickets
+// Esta ruta DEBE ser igual en ambos archivos para que lean el mismo JSON
 const dbPath = path.resolve(__dirname, "../../DataBaseJson/staff.json");
 
 module.exports = {
