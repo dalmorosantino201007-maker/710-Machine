@@ -1,8 +1,11 @@
 require('dotenv').config(); 
-const mercadopago = require("mercadopago");
+// Nueva forma de importar Mercado Pago (SDK v2)
+const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-// Configuración de Mercado Pago usando el token del archivo .env
-mercadopago.configurations.setAccessToken(process.env.ACCESS_TOKEN_MP);
+// Configuración del cliente de Mercado Pago
+const clientMP = new MercadoPagoConfig({ 
+    accessToken: process.env.ACCESS_TOKEN_MP 
+});
 
 const { 
     Client, 
@@ -20,9 +23,9 @@ const path = require('path');
 const moment = require('moment');
 const cron = require('node-cron');
 const transcripts = require('discord-html-transcripts'); 
-const otplib = require('otplib'); // <--- AGREGADO PARA 2FA
+const otplib = require('otplib'); 
 
-// Carga de configuración desde tu ruta específica
+// Carga de configuración
 const config = require('./DataBaseJson/config.json');
 
 moment.locale('es');
@@ -218,44 +221,42 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
-        // --- LÓGICA DE MERCADO PAGO ---
-        if (customId === "boton_pago_mp") {
-            await interaction.deferReply({ ephemeral: false });
-            try {
-                const monto = 1500; // Puedes cambiarlo por una variable si usas DB
-                const aliasMP = config.pagos?.alias || "710 Shop";
-
-                let preference = {
-                    items: [{
-                        title: "Pago de Productos - 710 Shop",
-                        unit_price: Number(monto),
-                        quantity: 1,
-                        currency_id: 'ARS'
-                    }]
-                };
-
-                const res = await mercadopago.preferences.create(preference);
-                const link = res.body.init_point;
-                const qrUrl = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(link)}&choe=UTF-8`;
-
-                const embedMP = new MessageEmbed()
-                    .setTitle("💳 Sistema de Pago Automático")
-                    .setDescription(`Para completar tu compra de **$${monto}**, escanea el código QR con tu App de Mercado Pago.\n\n**Alias:** \`${aliasMP}\``)
-                    .setImage(qrUrl)
-                    .setColor("#009EE3")
-                    .setFooter({ text: "Una vez realizado el pago, envía el comprobante aquí." })
-                    .setTimestamp();
-
-                const rowMP = new MessageActionRow().addComponents(
-                    new MessageButton().setLabel("Pagar en la App").setURL(link).setStyle("LINK")
-                );
-
-                return await interaction.editReply({ embeds: [embedMP], components: [rowMP] });
-            } catch (error) {
-                console.error(error);
-                return await interaction.editReply({ content: "❌ Error al conectar con Mercado Pago. Verifica tu Token en el .env" });
+// --- LÓGICA DE MERCADO PAGO (Versión Nueva SDK v2) ---
+if (interaction.customId === "boton_pago_mp") {
+    await interaction.deferReply();
+    try {
+        const preference = new Preference(clientMP); // <--- Usamos el nuevo cliente
+        const response = await preference.create({
+            body: {
+                items: [{
+                    title: "Pago 710 Shop",
+                    unit_price: 1500,
+                    quantity: 1,
+                    currency_id: 'ARS'
+                }]
             }
-        }
+        });
+
+        const link = response.init_point; // En la v2 es directo, sin .body
+        const qrUrl = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(link)}`;
+
+        // ... resto de tu código del embed y botones ...
+        const embed = new MessageEmbed()
+            .setTitle("💳 Pago Mercado Pago")
+            .setDescription(`Escanea el QR para pagar\n\n**Alias:** \`710 Shop\``)
+            .setImage(qrUrl)
+            .setColor("#009EE3");
+
+        const row = new MessageActionRow().addComponents(
+            new MessageButton().setLabel("Pagar Directo").setURL(link).setStyle("LINK")
+        );
+
+        await interaction.editReply({ embeds: [embed], components: [row] });
+    } catch (e) {
+        console.error(e);
+        await interaction.editReply("❌ Error al generar el pago.");
+    }
+}
 
         // --- NUEVO: LÓGICA DE LIMPIEZA DE DM ---
         if (customId === "limpiar_dm_proceso") {
