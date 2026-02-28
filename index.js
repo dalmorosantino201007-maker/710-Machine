@@ -1,11 +1,28 @@
-require('dotenv').config();
-const { Client, Collection, MessageEmbed, MessageActionRow, MessageButton, Modal, TextInputComponent, MessageSelectMenu } = require('discord.js');
+require('dotenv').config(); 
+const mercadopago = require("mercadopago");
+
+// Configuración de Mercado Pago usando el token del archivo .env
+mercadopago.configurations.setAccessToken(process.env.ACCESS_TOKEN_MP);
+
+const { 
+    Client, 
+    Collection, 
+    MessageEmbed, 
+    MessageActionRow, 
+    MessageButton, 
+    Modal, 
+    TextInputComponent, 
+    MessageSelectMenu 
+} = require('discord.js');
+
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
 const cron = require('node-cron');
 const transcripts = require('discord-html-transcripts'); 
 const otplib = require('otplib'); // <--- AGREGADO PARA 2FA
+
+// Carga de configuración desde tu ruta específica
 const config = require('./DataBaseJson/config.json');
 
 moment.locale('es');
@@ -201,6 +218,45 @@ client.on('interactionCreate', async (interaction) => {
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
+        // --- LÓGICA DE MERCADO PAGO ---
+        if (customId === "boton_pago_mp") {
+            await interaction.deferReply({ ephemeral: false });
+            try {
+                const monto = 1500; // Puedes cambiarlo por una variable si usas DB
+                const aliasMP = config.pagos?.alias || "710 Shop";
+
+                let preference = {
+                    items: [{
+                        title: "Pago de Productos - 710 Shop",
+                        unit_price: Number(monto),
+                        quantity: 1,
+                        currency_id: 'ARS'
+                    }]
+                };
+
+                const res = await mercadopago.preferences.create(preference);
+                const link = res.body.init_point;
+                const qrUrl = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(link)}&choe=UTF-8`;
+
+                const embedMP = new MessageEmbed()
+                    .setTitle("💳 Sistema de Pago Automático")
+                    .setDescription(`Para completar tu compra de **$${monto}**, escanea el código QR con tu App de Mercado Pago.\n\n**Alias:** \`${aliasMP}\``)
+                    .setImage(qrUrl)
+                    .setColor("#009EE3")
+                    .setFooter({ text: "Una vez realizado el pago, envía el comprobante aquí." })
+                    .setTimestamp();
+
+                const rowMP = new MessageActionRow().addComponents(
+                    new MessageButton().setLabel("Pagar en la App").setURL(link).setStyle("LINK")
+                );
+
+                return await interaction.editReply({ embeds: [embedMP], components: [rowMP] });
+            } catch (error) {
+                console.error(error);
+                return await interaction.editReply({ content: "❌ Error al conectar con Mercado Pago. Verifica tu Token en el .env" });
+            }
+        }
+
         // --- NUEVO: LÓGICA DE LIMPIEZA DE DM ---
         if (customId === "limpiar_dm_proceso") {
             await interaction.reply({ content: "⏳ Iniciando limpieza de mis mensajes en tus DMs...", ephemeral: true });
@@ -254,13 +310,11 @@ client.on('interactionCreate', async (interaction) => {
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
             
-            // ACTUALIZACIÓN DE RANKING
             updateRanking(user.id, user.tag);
 
             await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
             await channel.setName(`atendido-${user.username}`).catch(() => {});
             
-            // Enviar log detallado al canal de logs
             const embedAsumir = new MessageEmbed()
                 .setTitle("📌 Ticket Asumido")
                 .setColor("PURPLE")
@@ -320,8 +374,6 @@ client.on('interactionCreate', async (interaction) => {
 
     // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
-
-        // --- LÓGICA 2FA (PROCESAMIENTO) ---
         if (interaction.customId === 'modal_generar_2fa') {
             const secret = interaction.fields.getTextInputValue('clave_secreta').replace(/\s/g, '');
             try {
@@ -477,6 +529,7 @@ client.on('interactionCreate', async (interaction) => {
                 const row = new MessageActionRow().addComponents(
                     new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
                     new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                    new MessageButton().setCustomId("boton_pago_mp").setLabel("Mercado Pago").setStyle("PRIMARY").setEmoji("💳"),
                     new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
                 );
 
@@ -488,9 +541,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// ==========================================
-// 🔥 SISTEMA DE VIGILANCIA (FULL LOGS)
-// ==========================================
+// --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
 
 client.on('messageCreate', m => {
     if (!m.guild || m.author.bot || m.channel.id === canalLogsId) return;
@@ -504,7 +555,6 @@ client.on('messageDelete', m => {
 
 client.on('messageUpdate', (o, n) => {
     if (!o || !o.author || o.author.bot || o.content === n.content) return;
-
     enviarLog(new MessageEmbed()
         .setTitle("✏️ Mensaje Editado")
         .setColor("#ffff00")
@@ -557,35 +607,14 @@ client.on('ready', async () => {
             .map(cmd => cmd.data.toJSON());
         
         const comandosManuales = [
-            { 
-                name: 'renvembed', 
-                description: 'Reenvía el último mensaje del bot y borra el viejo',
-                type: 'CHAT_INPUT'
-            },
-            { 
-                name: 'clearpanel', 
-                description: 'Muestra el panel para limpiar tus mensajes directos',
-                type: 'CHAT_INPUT'
-            },
-            { 
-                name: 'comandlist',
-                description: 'Muestra la lista de comandos y sus permisos',
-                type: 'CHAT_INPUT'
-            },
-            { 
-                name: 'rankingstaff',
-                description: 'Muestra el top de Staff con más tickets asumidos',
-                type: 'CHAT_INPUT'
-            },
-            { 
-                name: 'rankingreset',
-                description: 'Resetea el ranking de Staff (Solo Admins)',
-                type: 'CHAT_INPUT'
-            }
+            { name: 'renvembed', description: 'Reenvía el último mensaje del bot y borra el viejo', type: 'CHAT_INPUT' },
+            { name: 'clearpanel', description: 'Muestra el panel para limpiar tus mensajes directos', type: 'CHAT_INPUT' },
+            { name: 'comandlist', description: 'Muestra la lista de comandos y sus permisos', type: 'CHAT_INPUT' },
+            { name: 'rankingstaff', description: 'Muestra el top de Staff con más tickets asumidos', type: 'CHAT_INPUT' },
+            { name: 'rankingreset', description: 'Resetea el ranking de Staff (Solo Admins)', type: 'CHAT_INPUT' }
         ];
 
         const listaFinal = [...comandosParaRegistrar, ...comandosManuales];
-
         const guildId = '1469618754282586154';
         const guild = client.guilds.cache.get(guildId);
         

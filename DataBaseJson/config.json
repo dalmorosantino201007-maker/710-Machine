@@ -15,6 +15,15 @@
     "colorpredeterminado": "#000001",
     "token": "",
     "sugerir_canal": "1469950357785546853",
+    "roles": {
+        "reseller": "1473471902810112062",
+        "customer": "1470894748041482416",
+        "ultra": "1470865175866507394"
+    },
+    "pagos": {
+        "alias": "710 Shop",
+        "moneda": "ARS"
+    },
     "ticket": {
         "ticket1": {
             "nome": "Compra",
