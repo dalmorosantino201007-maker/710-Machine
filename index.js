@@ -365,6 +365,7 @@ client.on('interactionCreate', async (interaction) => {
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒")
             );
 
+            // --- FINAL DE LA LÓGICA DE ENVÍO DE TICKET ---
             await nChannel.send({ 
                 content: `${user} | <@&${rolPermitidoId}>`, 
                 embeds: [embedTicket], 
@@ -372,7 +373,12 @@ client.on('interactionCreate', async (interaction) => {
             });
 
             return await interaction.editReply(`✅ Ticket creado con éxito: ${nChannel}`);
-        }
+        } // <--- CIERRA EL IF DE LOS MODALES (COMPRA, SOPORTE, PARTNER)
+    } // <--- CIERRA EL IF DE interaction.isModalSubmit()
+}); // <--- CIERRA EL client.on('interactionCreate')
+
+// --- LOGIN DEL BOT ---
+client.login(process.env.TOKEN || config.token);
 
 // --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
 
