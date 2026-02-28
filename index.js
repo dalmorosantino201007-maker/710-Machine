@@ -106,11 +106,9 @@ client.on('interactionCreate', async (interaction) => {
             );
             return interaction.reply({ content: 'Selecciona una opción:', components: [rowMenu], ephemeral: true });
         }
-        
-        // El resto de tus botones se procesan más abajo en la sección de LÓGICA DE BOTONES general
     }
 
-    // --- 2. MENÚS DE SELECCIÓN (Corregido: Cierre de llaves añadido) ---
+    // --- 2. MENÚS DE SELECCIÓN ---
     if (interaction.isSelectMenu()) {
         if (interaction.customId === 'menu_metodos') {
             const seleccion = interaction.values[0];
@@ -133,7 +131,6 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // Calificación de staff
         if (interaction.customId.startsWith("calificar_staff_")) {
             const staffId = interaction.customId.split('_')[2];
             const nota = interaction.values[0];
@@ -152,13 +149,10 @@ client.on('interactionCreate', async (interaction) => {
             if (canalReviews) canalReviews.send({ embeds: [embedReview] });
             return interaction.reply({ content: `✅ ¡Gracias! Has calificado la atención con ${nota} estrellas.`, ephemeral: true });
         }
-    }
+    } 
 
-    // --- 3. LÓGICA DE COMANDOS (Ahora fuera de los if de menús) ---
-    // 🔥 BLOQUE CORREGIDO DE LÓGICA DE COMANDOS
-
-// --- 3. LÓGICA DE COMANDOS (Ahora correctamente estructurada) ---
-if (interaction.isChatInputCommand()) {
+    // --- 3. LÓGICA DE COMANDOS ---
+    if (interaction.isCommand()) {
 
         if (interaction.commandName === "renvembed") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
@@ -254,13 +248,13 @@ if (interaction.isChatInputCommand()) {
         const cmd = client.slashCommands.get(interaction.commandName);
         if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
-}
+    }
 
     // --- 4. LÓGICA DE BOTONES (Resto de botones) ---
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
-        if (interaction.customId === "boton_pago_mp") {
+        if (customId === "boton_pago_mp") {
             const embedPago = new MessageEmbed()
                 .setTitle("💳 Información de Pago - Mercado Pago")
                 .setDescription("Mercado Pago es uno de nuestros métodos de pago, a continuación se le otorgará los datos para enviar el dinero.")
@@ -322,6 +316,7 @@ if (interaction.isChatInputCommand()) {
             await channel.setName(`atendido-${user.username}`).catch(() => {});
             const embedAsumir = new MessageEmbed().setTitle("📌 Ticket Asumido").setColor("PURPLE").setDescription(`Un miembro del staff ha tomado el control.`).addFields({ name: "👷 Staff", value: `${user.tag}`, inline: true }).setTimestamp();
             enviarLog(embedAsumir);
+            return;
         }
 
         if (customId === "notificar") {
