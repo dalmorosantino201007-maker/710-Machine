@@ -97,25 +97,26 @@ client.on('interactionCreate', async (interaction) => {
 
         // Comando /mp MODIFICADO para mostrar todo directo
         // Comando /mp - Sin menús, directo y para todos
-        if (commandName === "mp") {
-            const embedPagos = new MessageEmbed()
-                .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
-                .setTitle("💳 INFORMACIÓN DE PAGOS")
-                .setColor("#5865F2")
-                .setDescription("Aquí tienes nuestros datos oficiales para realizar tus compras.")
-                .addFields(
-                    { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
-                    { name: "💳 Mercado Pago", value: "\u200B", inline: false },
-                    { name: "📌 CVU:", value: "```0000003100072461415651```", inline: true },
-                    { name: "🏷️ Alias:", value: "```710shop```", inline: true },
-                    { name: "👤 Titular:", value: "```Santino Dal Moro```", inline: true },
-                    { name: "🏦 Banco:", value: "```Mercado Pago```", inline: true }
-                )
-                .setFooter({ text: "⚠️ Envía el comprobante para validar tu pedido." })
-                .setTimestamp();
+        i// Dentro de if (interaction.isCommand())
+// Dentro de if (interaction.isCommand())
+if (commandName === "mp") {
+    const embedPagos = new MessageEmbed()
+        .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
+        .setTitle("💳 INFORMACIÓN DE PAGOS")
+        .setColor("#5865F2")
+        .addFields(
+            { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
+            { name: "💳 Mercado Pago", value: "\u200B", inline: false },
+            { name: "📌 CVU:", value: "```0000003100072461415651```", inline: true },
+            { name: "🏷️ Alias:", value: "```710shop```", inline: true },
+            { name: "👤 Titular:", value: "```Santino Dal Moro```", inline: true },
+            { name: "🏦 Banco:", value: "```Mercado Pago```", inline: true }
+        )
+        .setFooter({ text: "⚠️ Envía el comprobante para validar tu pedido." })
+        .setTimestamp();
 
-            return await interaction.reply({ embeds: [embedPagos], ephemeral: false });
-        } // <-- Asegúrate de que esta llave cierre el IF
+    return await interaction.reply({ embeds: [embedPagos], ephemeral: false });
+}
 
         // ... el resto de tus comandos (renvembed, clearpanel, etc.)
 
@@ -272,41 +273,15 @@ client.on('interactionCreate', async (interaction) => {
     // --- 4. MODALES ---
     // --- LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
-        const { customId, fields, guild, channel, user } = interaction;
-
-        if (customId === 'modal_generar_2fa') {
-            const secret = fields.getTextInputValue('clave_secreta').replace(/\s/g, '');
-            try { return interaction.reply({ content: `🔑 Código: **${otplib.authenticator.generate(secret)}**`, ephemeral: true }); }
-            catch { return interaction.reply({ content: "❌ Clave inválida.", ephemeral: true }); }
-        }
-
-        if (customId === 'modal_nota_cierre') {
-            await interaction.deferReply({ ephemeral: true });
-            const nota = fields.getTextInputValue('nota_staff') || "Sin nota.";
-            const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
-            const transcriptFile = await transcripts.createTranscript(channel, { fileName: `transcript-${channel.name}.html` });
-            
-            if (targetId) {
-                const target = await client.users.fetch(targetId);
-                const rowReview = new MessageActionRow().addComponents(new MessageSelectMenu().setCustomId(`calificar_staff_${user.id}`).setPlaceholder('Califica').addOptions([{label:'5 Estrellas', value:'5'}]));
-                await target.send({ content: `Ticket cerrado. Nota: ${nota}`, files: [transcriptFile], components: [rowReview] }).catch(() => {});
-            }
-            guild.channels.cache.get(canalTranscriptsId)?.send({ content: `Ticket: ${channel.name}`, files: [transcriptFile] });
-            await interaction.editReply("✅ Cerrando...");
-            return setTimeout(() => channel.delete().catch(() => {}), 3000);
-        }
-
-        // Creación de Tickets (Compra, Soporte, Partner) - MODIFICADO PARA DISEÑO PRO
-        // Creación de Tickets (Compra, Soporte, Partner) - ¡CON PARTNER INCLUIDO!
         if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(customId)) {
             await interaction.deferReply({ ephemeral: true });
-            
-            let cateId = CATEGORIAS.COMPRA; // Por defecto
+
+            let cateId = CATEGORIAS.COMPRA;
             let nombre = `🛒-buy-${user.username}`;
             let tituloEmbed = "🛒 NUEVA ORDEN DE COMPRA";
-            let colorEmbed = "#57F287"; // Verde
+            let colorEmbed = "#57F287";
             let camposExtra = [];
-            
+
             if (customId === 'modal_compra') {
                 camposExtra = [
                     { name: '📦 Producto:', value: `\`${fields.getTextInputValue('p_prod')}\``, inline: true },
@@ -314,26 +289,24 @@ client.on('interactionCreate', async (interaction) => {
                     { name: '🔢 Cantidad:', value: `\`${fields.getTextInputValue('p_cant')}\``, inline: true }
                 ];
             } else if (customId === 'modal_soporte') {
-                cateId = CATEGORIAS.SOPORTE; 
-                nombre = `🛠️-soporte-${user.username}`; 
+                cateId = CATEGORIAS.SOPORTE;
+                nombre = `🛠️-soporte-${user.username}`;
                 tituloEmbed = "🛠️ CENTRO DE SOPORTE";
-                colorEmbed = "#5865F2"; // Azul
+                colorEmbed = "#5865F2";
                 camposExtra = [{ name: '❓ Consulta:', value: `\`${fields.getTextInputValue('p_duda')}\``, inline: false }];
             } else if (customId === 'modal_partner') {
-                // --- SECCIÓN DE PARTNER ---
-                cateId = CATEGORIAS.PARTNER; 
-                nombre = `🤝-partner-${user.username}`; 
+                cateId = CATEGORIAS.PARTNER;
+                nombre = `🤝-partner-${user.username}`;
                 tituloEmbed = "🤝 SOLICITUD DE PARTNER";
-                colorEmbed = "#EB459E"; // Rosa/Magenta
+                colorEmbed = "#EB459E";
                 camposExtra = [
-                    { name: '📢 ¿Añadiste el add?:', value: `\`${fields.getTextInputValue('p_add')}\``, inline: true },
-                    { name: '🔗 Link del Servidor:', value: `\`${fields.getTextInputValue('p_link')}\``, inline: true }
+                    { name: '📢 Add:', value: `\`${fields.getTextInputValue('p_add')}\``, inline: true },
+                    { name: '🔗 Link:', value: `\`${fields.getTextInputValue('p_link')}\``, inline: true }
                 ];
             }
 
-            // Crear el canal
             const nChannel = await guild.channels.create(nombre, {
-                type: 'GUILD_TEXT', 
+                type: 'GUILD_TEXT',
                 parent: cateId,
                 permissionOverwrites: [
                     { id: guild.id, deny: ['VIEW_CHANNEL'] },
@@ -342,22 +315,20 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
-            // DISEÑO DEL EMBED DE BIENVENIDA
             const embedTicket = new MessageEmbed()
                 .setAuthor({ name: '710 | Machine Services', iconURL: client.user.displayAvatarURL() })
                 .setTitle(tituloEmbed)
                 .setColor(colorEmbed)
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .setDescription(`Hola ${user}, bienvenido a tu ticket.\n\n> Un miembro del **Staff** revisará tu solicitud en breve. Por favor, no cierres el ticket hasta recibir respuesta.`)
+                .setDescription(`Hola ${user}, bienvenido.\n\n> Un miembro del **Staff** te atenderá pronto.`)
                 .addFields(
                     { name: "👤 Cliente:", value: `${user}`, inline: true },
                     { name: "🆔 ID Usuario:", value: `\`${user.id}\``, inline: true },
                     ...camposExtra
                 )
-                .setFooter({ text: "710 | Machine Services - Gestión de Tickets" })
+                .setFooter({ text: "710 | Machine Services" })
                 .setTimestamp();
 
-            // BOTONES (Se mantienen todos, incluyendo Pagos por si acaso)
             const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
                 new MessageButton().setCustomId("boton_pago_mp").setLabel("Pagos").setStyle("PRIMARY").setEmoji("💳"),
@@ -365,19 +336,27 @@ client.on('interactionCreate', async (interaction) => {
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒")
             );
 
-            // --- FINAL DE LA LÓGICA DE ENVÍO DE TICKET ---
-            await nChannel.send({ 
-                content: `${user} | <@&${rolPermitidoId}>`, 
-                embeds: [embedTicket], 
-                components: [row] 
-            });
+            await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
+            return await interaction.editReply(`✅ Ticket creado: ${nChannel}`);
+        }
+    }
 
-            return await interaction.editReply(`✅ Ticket creado con éxito: ${nChannel}`);
-        } // <--- CIERRA EL IF DE LOS MODALES (COMPRA, SOPORTE, PARTNER)
-    } // <--- CIERRA EL IF DE interaction.isModalSubmit()
-}); // <--- CIERRA EL client.on('interactionCreate')
+    // --- BOTONES ---
+    if (interaction.isButton()) {
+        if (customId === "boton_pago_mp") {
+            // Reutilizamos el comando /mp aquí para que el botón de Pagos funcione
+            const embedPagos = new MessageEmbed()
+                .setTitle("💳 INFORMACIÓN DE PAGOS")
+                .setColor("#009EE3")
+                .addFields(
+                    { name: "📌 CVU:", value: "```0000003100072461415651```" },
+                    { name: "🏷️ Alias:", value: "```710shop```" }
+                );
+            return await interaction.reply({ embeds: [embedPagos], ephemeral: true });
+        }
+    }
+}); // <--- ESTA LLAVE ES VITAL PARA CERRAR EL EVENTO
 
-// --- LOGIN DEL BOT ---
 client.login(process.env.TOKEN || config.token);
 
 // --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
