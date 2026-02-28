@@ -222,40 +222,25 @@ client.on('interactionCreate', async (interaction) => {
         const { customId, member, user, channel } = interaction;
         
 // --- LÓGICA DE MERCADO PAGO (Versión Nueva SDK v2) ---
+// --- LÓGICA DE PAGO MANUAL (REEMPLAZO DE QR) ---
 if (interaction.customId === "boton_pago_mp") {
-    await interaction.deferReply();
-    try {
-        const preference = new Preference(clientMP); // <--- Usamos el nuevo cliente
-        const response = await preference.create({
-            body: {
-                items: [{
-                    title: "Pago 710 Shop",
-                    unit_price: 1500,
-                    quantity: 1,
-                    currency_id: 'ARS'
-                }]
-            }
-        });
+    // No usamos deferReply aquí para evitar el error de "Interaction already acknowledged"
+    
+    const embedPago = new MessageEmbed()
+        .setTitle("💳 Información de Pago - Mercado Pago")
+        .setDescription("Mercado Pago es uno de nuestros métodos de pago, a continuación se le otorgará los datos para enviar el dinero.")
+        .addFields(
+            { name: "• CVU:", value: "```0000003100072461415651```", inline: false },
+            { name: "• Alias:", value: "```710shop```", inline: false },
+            { name: "¿Cuál es el titular del CVU?", value: "\u200B", inline: false },
+            { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```", inline: false },
+            { name: "• Banco:", value: "```Mercado Pago```", inline: false }
+        )
+        .setFooter({ text: "Una vez enviado el dinero, recordá enviar comprobante, esto nos ayudará a comprobar tu pago de manera más rápida.", iconURL: client.user.displayAvatarURL() })
+        .setColor("#009EE3")
+        .setTimestamp();
 
-        const link = response.init_point; // En la v2 es directo, sin .body
-        const qrUrl = `https://chart.googleapis.com/chart?chs=300x300&cht=qr&chl=${encodeURIComponent(link)}`;
-
-        // ... resto de tu código del embed y botones ...
-        const embed = new MessageEmbed()
-            .setTitle("💳 Pago Mercado Pago")
-            .setDescription(`Escanea el QR para pagar\n\n**Alias:** \`710 Shop\``)
-            .setImage(qrUrl)
-            .setColor("#009EE3");
-
-        const row = new MessageActionRow().addComponents(
-            new MessageButton().setLabel("Pagar Directo").setURL(link).setStyle("LINK")
-        );
-
-        await interaction.editReply({ embeds: [embed], components: [row] });
-    } catch (e) {
-        console.error(e);
-        await interaction.editReply("❌ Error al generar el pago.");
-    }
+    return await interaction.reply({ embeds: [embedPago], ephemeral: false });
 }
 
         // --- NUEVO: LÓGICA DE LIMPIEZA DE DM ---
