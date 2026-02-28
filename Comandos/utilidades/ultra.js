@@ -1,67 +1,81 @@
 const Discord = require("discord.js");
-const { JsonDatabase } = require("wio.db");
-const config = new JsonDatabase({ databasePath: "./config.json" });
+// Verifica que la ruta a tu config.json sea correcta según tu carpeta
+const config = require("../../DataBaseJson/config.json");
 
 module.exports = {
   name: "ultra",
-  description: "Asigna el rango de Ultra Customer a un usuario",
-  type: "CHAT_INPUT",
+  description: "💎 | Asigna el rango de Ultra Customer a un usuario VIP.",
   options: [
     {
       name: "usuario",
-      description: "El usuario que será Ultra Customer",
+      description: "Selecciona al usuario para otorgarle el rango Ultra.",
       type: "USER",
-      required: true
-    }
+      required: true,
+    },
   ],
 
-  run: async (client, interaction, args) => {
-    // 1. Verificar permisos (Solo Admins)
-    if (!interaction.member.permissions.has("ADMINISTRATOR")) {
-      return interaction.reply({ 
-        content: "❌ No tienes permisos para usar este comando.", 
-        ephemeral: true 
-      });
-    }
-
-    const usuario = interaction.options.getMember("usuario");
-    const rolID = config.get("roles.ultra"); // O .customer / .ultra
-
-    if (!usuario) {
-        return interaction.reply({ content: "❌ No pude encontrar a ese usuario.", ephemeral: true });
-    }
+  run: async (client, interaction) => {
+    // 1. Evitamos que la interacción expire (Importante para evitar errores de respuesta)
+    await interaction.deferReply({ ephemeral: true });
 
     try {
-      // 2. Dar el rol
-      await usuario.roles.add(rolUltraID);
+      // 2. Control de permisos del Staff
+      if (!interaction.member.permissions.has("ADMINISTRATOR")) {
+        return interaction.editReply({ 
+            content: "❌ No tienes permisos de Administrador para otorgar rangos VIP." 
+        });
+      }
 
-      // 3. Cambiar el apodo exactamente como pediste
-      // Formato: Ultra Customer | Nombre
-      const nuevoNombre = `Ultra Customer | ${usuario.user.username}`.substring(0, 32);
-      await usuario.setNickname(nuevoNombre);
+      const targetUser = interaction.options.getMember("usuario");
+      
+      // 3. Obtener el ID desde config.json (Asegúrate de tener "ultra": "ID" allí)
+      const roleId = config.roles.ultra; 
+      const role = interaction.guild.roles.cache.get(roleId);
 
-      // 4. Mensaje de éxito
+      // 4. Validaciones de seguridad
+      if (!role) {
+        return interaction.editReply({ 
+            content: "❌ Error: El rol de **Ultra Customer** no está configurado correctamente en `config.json`." 
+        });
+      }
+
+      if (targetUser.roles.cache.has(role.id)) {
+        return interaction.editReply({ 
+            content: `⚠️ El usuario ${targetUser} ya posee el estatus de **Ultra Customer**.` 
+        });
+      }
+
+      // 5. Asignación del rol
+      await targetUser.roles.add(role);
+
+      // 6. Embed Premium
       const embed = new Discord.MessageEmbed()
-        .setTitle("✨ ¡NIVEL ULTRA ALCANZADO! ✨")
-        .setDescription(`El usuario ${usuario} ha sido ascendido con éxito.`)
+        .setTitle("✨ ¡NUEVO ULTRA CUSTOMER! ✨")
+        .setDescription(`Se ha elevado el rango de ${targetUser} a **Ultra Customer** con éxito.`)
         .addFields(
-            { name: "👤 Usuario:", value: `${usuario.user.tag}`, inline: true },
-            { name: "👑 Rango:", value: `**Ultra Customer**`, inline: true },
-            { name: "🏷️ Nuevo Apodo:", value: `\`${nuevoNombre}\``, inline: false }
+            { name: "💎 Miembro VIP:", value: `${targetUser}`, inline: true },
+            { name: "👑 Autorizado por:", value: `${interaction.user}`, inline: true },
+            { name: "🛡️ Beneficios:", value: "Acceso exclusivo a funciones avanzadas.", inline: false }
         )
-        .setColor("#FFD700") // Color Oro
-        .setThumbnail(usuario.user.displayAvatarURL({ dynamic: true }))
-        .setFooter({ text: `Sistema de Rangos - ${interaction.user.username}` })
+        .setColor("#F1C40F") // Color Oro / Dorado
+        .setThumbnail("https://i.imgur.com/8Q9Z5Xm.png") // Opcional: puedes poner un emoji de diamante o tu logo
+        .setFooter({ text: "710 Shop - Estatus VIP", iconURL: client.user.displayAvatarURL() })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
 
     } catch (error) {
-      console.error(error);
-      interaction.reply({ 
-        content: "❌ **Error de Permisos:** Mi rol debe estar por ENCIMA del rol de Ultra Customer y del usuario en los ajustes del servidor para poder cambiarle el nombre.", 
-        ephemeral: true 
+      console.error("Error en ultracustomer:", error);
+
+      if (error.code === 50013) {
+          return interaction.editReply({
+            content: "❌ **Error de Jerarquía:** No puedo dar un rol que está por encima del mío. Sube mi rol de Bot en los ajustes del servidor.",
+          });
+      }
+
+      return interaction.editReply({ 
+          content: "❌ Error inesperado al procesar el rango Ultra." 
       });
     }
-  }
+  },
 };
