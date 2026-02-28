@@ -297,13 +297,14 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         // Creación de Tickets (Compra, Soporte, Partner) - MODIFICADO PARA DISEÑO PRO
+        // Creación de Tickets (Compra, Soporte, Partner) - ¡CON PARTNER INCLUIDO!
         if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(customId)) {
             await interaction.deferReply({ ephemeral: true });
             
-            let cateId = CATEGORIAS.COMPRA;
+            let cateId = CATEGORIAS.COMPRA; // Por defecto
             let nombre = `🛒-buy-${user.username}`;
             let tituloEmbed = "🛒 NUEVA ORDEN DE COMPRA";
-            let colorEmbed = "#57F287";
+            let colorEmbed = "#57F287"; // Verde
             let camposExtra = [];
             
             if (customId === 'modal_compra') {
@@ -316,10 +317,21 @@ client.on('interactionCreate', async (interaction) => {
                 cateId = CATEGORIAS.SOPORTE; 
                 nombre = `🛠️-soporte-${user.username}`; 
                 tituloEmbed = "🛠️ CENTRO DE SOPORTE";
-                colorEmbed = "#5865F2";
+                colorEmbed = "#5865F2"; // Azul
                 camposExtra = [{ name: '❓ Consulta:', value: `\`${fields.getTextInputValue('p_duda')}\``, inline: false }];
+            } else if (customId === 'modal_partner') {
+                // --- SECCIÓN DE PARTNER ---
+                cateId = CATEGORIAS.PARTNER; 
+                nombre = `🤝-partner-${user.username}`; 
+                tituloEmbed = "🤝 SOLICITUD DE PARTNER";
+                colorEmbed = "#EB459E"; // Rosa/Magenta
+                camposExtra = [
+                    { name: '📢 ¿Añadiste el add?:', value: `\`${fields.getTextInputValue('p_add')}\``, inline: true },
+                    { name: '🔗 Link del Servidor:', value: `\`${fields.getTextInputValue('p_link')}\``, inline: true }
+                ];
             }
 
+            // Crear el canal
             const nChannel = await guild.channels.create(nombre, {
                 type: 'GUILD_TEXT', 
                 parent: cateId,
@@ -330,20 +342,22 @@ client.on('interactionCreate', async (interaction) => {
                 ]
             });
 
+            // DISEÑO DEL EMBED DE BIENVENIDA
             const embedTicket = new MessageEmbed()
                 .setAuthor({ name: '710 | Machine Services', iconURL: client.user.displayAvatarURL() })
                 .setTitle(tituloEmbed)
                 .setColor(colorEmbed)
                 .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                .setDescription(`Hola ${user}, bienvenido a tu ticket.\n\n> Un miembro del **Staff** te atenderá pronto.`)
+                .setDescription(`Hola ${user}, bienvenido a tu ticket.\n\n> Un miembro del **Staff** revisará tu solicitud en breve. Por favor, no cierres el ticket hasta recibir respuesta.`)
                 .addFields(
                     { name: "👤 Cliente:", value: `${user}`, inline: true },
                     { name: "🆔 ID Usuario:", value: `\`${user.id}\``, inline: true },
                     ...camposExtra
                 )
-                .setFooter({ text: "710 | Machine Services" })
+                .setFooter({ text: "710 | Machine Services - Gestión de Tickets" })
                 .setTimestamp();
 
+            // BOTONES (Se mantienen todos, incluyendo Pagos por si acaso)
             const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
                 new MessageButton().setCustomId("boton_pago_mp").setLabel("Pagos").setStyle("PRIMARY").setEmoji("💳"),
@@ -351,8 +365,13 @@ client.on('interactionCreate', async (interaction) => {
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒")
             );
 
-            await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
-            return await interaction.editReply(`✅ Ticket creado: ${nChannel}`);
+            await nChannel.send({ 
+                content: `${user} | <@&${rolPermitidoId}>`, 
+                embeds: [embedTicket], 
+                components: [row] 
+            });
+
+            return await interaction.editReply(`✅ Ticket creado con éxito: ${nChannel}`);
         }
 
 // --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
