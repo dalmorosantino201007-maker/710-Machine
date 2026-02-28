@@ -89,7 +89,6 @@ const enviarLog = (embed) => {
 // 🕹️ LÓGICA DE INTERACCIONES (TICKETS Y COMANDOS)
 // ==========================================
 
-// Asegúrate de que diga "async (interaction)"
 client.on('interactionCreate', async (interaction) => {
     
     // --- 1. TU LÓGICA DE BOTONES ---
@@ -106,6 +105,8 @@ client.on('interactionCreate', async (interaction) => {
             );
             return interaction.reply({ content: 'Selecciona una opción:', components: [rowMenu], ephemeral: true });
         }
+        
+        // El resto de botones se procesan en la sección 4
     }
 
     // --- 2. MENÚS DE SELECCIÓN ---
@@ -131,6 +132,7 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
+        // Calificación de staff
         if (interaction.customId.startsWith("calificar_staff_")) {
             const staffId = interaction.customId.split('_')[2];
             const nota = interaction.values[0];
@@ -269,7 +271,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor("#009EE3")
                 .setTimestamp();
 
-            return await interaction.reply({ embeds: [embedPago], ephemeral: false });
+            return interaction.reply({ embeds: [embedPago], ephemeral: false });
         }
 
         if (customId === "limpiar_dm_proceso") {
@@ -290,7 +292,7 @@ client.on('interactionCreate', async (interaction) => {
             const modal2fa = new Modal().setCustomId('modal_generar_2fa').setTitle('Generador de Código 2FA');
             const inputClave = new TextInputComponent().setCustomId('clave_secreta').setLabel("Introduce tu Clave Secreta").setStyle('SHORT').setRequired(true);
             modal2fa.addComponents(new MessageActionRow().addComponents(inputClave));
-            return await interaction.showModal(modal2fa);
+            return interaction.showModal(modal2fa);
         }
 
         if (customId === "partner_rol") {
@@ -330,7 +332,7 @@ client.on('interactionCreate', async (interaction) => {
             const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
             const inputNota = new TextInputComponent().setCustomId('nota_staff').setLabel("Deja una nota").setStyle('PARAGRAPH').setRequired(false);
             modalNota.addComponents(new MessageActionRow().addComponents(inputNota));
-            return await interaction.showModal(modalNota);
+            return interaction.showModal(modalNota);
         }
 
         if (customId === "ticket_compra") {
@@ -340,13 +342,13 @@ client.on('interactionCreate', async (interaction) => {
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Que metodos de pagos?").setStyle('SHORT').setRequired(true)),
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_cant').setLabel("¿Cantidad?").setStyle('SHORT').setRequired(true))
             );
-            return await interaction.showModal(modal);
+            return interaction.showModal(modal);
         }
         
         if (customId === "ticket_soporte") {
             const modal = new Modal().setCustomId('modal_soporte').setTitle('Centro de Soporte');
             modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿En que necesitas Ayuda?").setStyle('PARAGRAPH').setRequired(true)));
-            return await interaction.showModal(modal);
+            return interaction.showModal(modal);
         }
         
         if (customId === "ticket_partner") {
@@ -355,7 +357,7 @@ client.on('interactionCreate', async (interaction) => {
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_add').setLabel("Ya añadiste nuestro add?").setStyle('SHORT').setRequired(true)),
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_link').setLabel("Link de tu server").setStyle('SHORT').setRequired(true))
             );
-            return await interaction.showModal(modal);
+            return interaction.showModal(modal);
         }
     }
 
