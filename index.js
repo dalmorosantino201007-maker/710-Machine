@@ -89,6 +89,7 @@ const enviarLog = (embed) => {
 // 🕹️ LÓGICA DE INTERACCIONES (TICKETS Y COMANDOS)
 // ==========================================
 
+// Asegúrate de que diga "async (interaction)"
 client.on('interactionCreate', async (interaction) => {
     
     // --- 1. BOTONES (MÉTODOS DE PAGO, ASUMIR, CERRAR) ---
