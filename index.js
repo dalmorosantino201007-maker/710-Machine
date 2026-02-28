@@ -92,7 +92,7 @@ const enviarLog = (embed) => {
 // Asegúrate de que diga "async (interaction)"
 client.on('interactionCreate', async (interaction) => {
     
-    // --- 1. BOTONES (MÉTODOS DE PAGO, ASUMIR, CERRAR) ---
+    // --- 1. TU LÓGICA DE BOTONES ---
     if (interaction.isButton()) {
         if (interaction.customId === 'metodos_pago') {
             const rowMenu = new MessageActionRow().addComponents(
@@ -107,40 +107,54 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: 'Selecciona una opción:', components: [rowMenu], ephemeral: true });
         }
         
-        // Aquí irían tus otros botones como 'asumir' o 'fechar_ticket'
+        // El resto de tus botones se procesan más abajo en la sección de LÓGICA DE BOTONES general
     }
 
-    // --- 2. MENÚS DE SELECCIÓN ---
-    if (interaction.isSelectMenu() && interaction.customId === 'menu_metodos') {
-        const seleccion = interaction.values[0];
-        if (seleccion === 'pago_mp') {
-            const embedMP = new MessageEmbed()
-                .setTitle("💳 Pago vía Mercado Pago").setColor("BLUE")
+    // --- 2. MENÚS DE SELECCIÓN (Corregido: Cierre de llaves añadido) ---
+    if (interaction.isSelectMenu()) {
+        if (interaction.customId === 'menu_metodos') {
+            const seleccion = interaction.values[0];
+            if (seleccion === 'pago_mp') {
+                const embedMP = new MessageEmbed()
+                    .setTitle("💳 Pago vía Mercado Pago").setColor("BLUE")
+                    .addFields(
+                        { name: "• CVU:", value: "```0000003100072461415651```" },
+                        { name: "• Alias:", value: "```710shop```" },
+                        { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```" }
+                    );
+                return interaction.update({ content: null, embeds: [embedMP], components: [] });
+            }
+
+            if (seleccion === 'pago_paypal') {
+                const embedPP = new MessageEmbed()
+                    .setTitle("💙 Pago vía PayPal").setColor("BLUE")
+                    .addFields({ name: "• Correo:", value: "```la710storeshop@gmail.com```" });
+                return interaction.update({ content: null, embeds: [embedPP], components: [] });
+            }
+        }
+
+        // Calificación de staff
+        if (interaction.customId.startsWith("calificar_staff_")) {
+            const staffId = interaction.customId.split('_')[2];
+            const nota = interaction.values[0];
+            const estrellas = "⭐".repeat(parseInt(nota));
+            const embedReview = new MessageEmbed()
+                .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
+                .setTitle("🌟 Nueva Calificación de Servicio")
+                .setColor("GOLD")
                 .addFields(
-                    { name: "• CVU:", value: "```0000003100072461415651```" },
-                    { name: "• Alias:", value: "```710shop```" },
-                    { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```" }
-                );
-            return interaction.update({ content: null, embeds: [embedMP], components: [] });
-        }
-
-        if (seleccion === 'pago_paypal') {
-            const embedPP = new MessageEmbed()
-                .setTitle("💙 Pago vía PayPal").setColor("BLUE")
-                .addFields({ name: "• Correo:", value: "```la710storeshop@gmail.com```" });
-            return interaction.update({ content: null, embeds: [embedPP], components: [] });
+                    { name: "👤 Usuario", value: `${interaction.user.tag}`, inline: true },
+                    { name: "👷 Staff Evaluado", value: `<@${staffId}>`, inline: true },
+                    { name: "📊 Puntuación", value: `${estrellas} (${nota}/5)`, inline: false }
+                )
+                .setTimestamp();
+            const canalReviews = client.channels.cache.get(canalReviewsId);
+            if (canalReviews) canalReviews.send({ embeds: [embedReview] });
+            return interaction.reply({ content: `✅ ¡Gracias! Has calificado la atención con ${nota} estrellas.`, ephemeral: true });
         }
     }
 
-    // --- 3. COMANDOS SLASH ---
-    if (interaction.isCommand()) {
-        // Aquí va tu lógica de renvembed, clearpanel, etc.
-        if (interaction.commandName === "renvembed") {
-            // ... tu código ...
-        }
-    }
-});
-    // --- LÓGICA DE COMANDOS ---
+    // --- 3. LÓGICA DE COMANDOS (Ahora fuera de los if de menús) ---
     if (interaction.isCommand()) {
         if (interaction.commandName === "renvembed") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
@@ -166,7 +180,6 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- NUEVO: COMANDO /CLEARPANEL ---
         if (interaction.commandName === "clearpanel") {
             const embedClear = new MessageEmbed()
                 .setTitle("🧹 Limpieza de Mensajes Directos")
@@ -186,7 +199,6 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ embeds: [embedClear], components: [rowClear] });
         }
 
-        // --- NUEVO: COMANDO /COMANDLIST ---
         if (interaction.commandName === "comandlist") {
             const embedList = new MessageEmbed()
                 .setTitle("📜 Lista de Comandos - 710 | Machine")
@@ -203,7 +215,6 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ embeds: [embedList], ephemeral: true });
         }
 
-        // --- NUEVO: COMANDO /RANKINGSTAFF ---
         if (interaction.commandName === "rankingstaff") {
             const ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
             const sorted = Object.entries(ranking)
@@ -228,7 +239,6 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ embeds: [embedRank] });
         }
 
-        // --- NUEVO: COMANDO /RANKINGRESET ---
         if (interaction.commandName === "rankingreset") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
                 return interaction.reply({ content: "❌ No tienes el rango necesario para resetear el ranking.", ephemeral: true });
@@ -242,80 +252,45 @@ client.on('interactionCreate', async (interaction) => {
         return;
     }
 
-    // --- LÓGICA DE MENÚS ---
-    if (interaction.isSelectMenu() && interaction.customId.startsWith("calificar_staff_")) {
-        const staffId = interaction.customId.split('_')[2];
-        const nota = interaction.values[0];
-        const estrellas = "⭐".repeat(parseInt(nota));
-        const embedReview = new MessageEmbed()
-            .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
-            .setTitle("🌟 Nueva Calificación de Servicio")
-            .setColor("GOLD")
-            .addFields(
-                { name: "👤 Usuario", value: `${interaction.user.tag}`, inline: true },
-                { name: "👷 Staff Evaluado", value: `<@${staffId}>`, inline: true },
-                { name: "📊 Puntuación", value: `${estrellas} (${nota}/5)`, inline: false }
-            )
-            .setTimestamp();
-        const canalReviews = client.channels.cache.get(canalReviewsId);
-        if (canalReviews) canalReviews.send({ embeds: [embedReview] });
-        return interaction.reply({ content: `✅ ¡Gracias! Has calificado la atención con ${nota} estrellas.`, ephemeral: true });
-    }
-
-    // --- LÓGICA DE BOTONES ---
+    // --- 4. LÓGICA DE BOTONES (Resto de botones) ---
     if (interaction.isButton()) {
         const { customId, member, user, channel } = interaction;
         
-// --- LÓGICA DE MERCADO PAGO (Versión Nueva SDK v2) ---
-// --- LÓGICA DE PAGO MANUAL (REEMPLAZO DE QR) ---
-if (interaction.customId === "boton_pago_mp") {
-    // No usamos deferReply aquí para evitar el error de "Interaction already acknowledged"
-    
-    const embedPago = new MessageEmbed()
-        .setTitle("💳 Información de Pago - Mercado Pago")
-        .setDescription("Mercado Pago es uno de nuestros métodos de pago, a continuación se le otorgará los datos para enviar el dinero.")
-        .addFields(
-            { name: "• CVU:", value: "```0000003100072461415651```", inline: false },
-            { name: "• Alias:", value: "```710shop```", inline: false },
-            { name: "¿Cuál es el titular del CVU?", value: "\u200B", inline: false },
-            { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```", inline: false },
-            { name: "• Banco:", value: "```Mercado Pago```", inline: false }
-        )
-        .setFooter({ text: "Una vez enviado el dinero, recordá enviar comprobante, esto nos ayudará a comprobar tu pago de manera más rápida.", iconURL: client.user.displayAvatarURL() })
-        .setColor("#009EE3")
-        .setTimestamp();
+        if (interaction.customId === "boton_pago_mp") {
+            const embedPago = new MessageEmbed()
+                .setTitle("💳 Información de Pago - Mercado Pago")
+                .setDescription("Mercado Pago es uno de nuestros métodos de pago, a continuación se le otorgará los datos para enviar el dinero.")
+                .addFields(
+                    { name: "• CVU:", value: "```0000003100072461415651```", inline: false },
+                    { name: "• Alias:", value: "```710shop```", inline: false },
+                    { name: "¿Cuál es el titular del CVU?", value: "\u200B", inline: false },
+                    { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```", inline: false },
+                    { name: "• Banco:", value: "```Mercado Pago```", inline: false }
+                )
+                .setFooter({ text: "Una vez enviado el dinero, recordá enviar comprobante...", iconURL: client.user.displayAvatarURL() })
+                .setColor("#009EE3")
+                .setTimestamp();
 
-    return await interaction.reply({ embeds: [embedPago], ephemeral: false });
-}
+            return await interaction.reply({ embeds: [embedPago], ephemeral: false });
+        }
 
-        // --- NUEVO: LÓGICA DE LIMPIEZA DE DM ---
         if (customId === "limpiar_dm_proceso") {
-            await interaction.reply({ content: "⏳ Iniciando limpieza de mis mensajes en tus DMs...", ephemeral: true });
+            await interaction.reply({ content: "⏳ Iniciando limpieza...", ephemeral: true });
             try {
                 const dmChannel = await user.createDM();
                 const mensajes = await dmChannel.messages.fetch({ limit: 100 });
                 const mensajesBot = mensajes.filter(m => m.author.id === client.user.id);
-                
                 if (mensajesBot.size === 0) return interaction.editReply({ content: "✅ No encontré mensajes míos para borrar." });
-
-                for (const msg of mensajesBot.values()) {
-                    await msg.delete().catch(() => {});
-                }
+                for (const msg of mensajesBot.values()) { await msg.delete().catch(() => {}); }
                 return interaction.editReply({ content: `✅ Limpieza completada. Se han eliminado ${mensajesBot.size} mensajes.` });
             } catch (error) {
-                return interaction.editReply({ content: "❌ No pude acceder a tus DMs. Asegúrate de tenerlos abiertos para miembros del servidor." });
+                return interaction.editReply({ content: "❌ No pude acceder a tus DMs." });
             }
         }
 
-        // --- LÓGICA 2FA (BOTÓN) ---
         if (customId === "ingresar_clave_2fa") {
             const modal2fa = new Modal().setCustomId('modal_generar_2fa').setTitle('Generador de Código 2FA');
-            const inputClave = new TextInputComponent()
-                .setCustomId('clave_secreta')
-                .setLabel("Introduce tu Clave Secreta (Secret Key)")
-                .setPlaceholder("Ej: JBSWY3DPEHPK3PXP")
-                .setStyle('SHORT')
-                .setRequired(true);
+            const inputClave = new TextInputComponent().setCustomId('clave_secreta').setLabel("Introduce tu Clave Secreta").setStyle('SHORT').setRequired(true);
             modal2fa.addComponents(new MessageActionRow().addComponents(inputClave));
             return await interaction.showModal(modal2fa);
         }
@@ -324,7 +299,6 @@ if (interaction.customId === "boton_pago_mp") {
             const rolPartnerId = "1470862847671140412"; 
             const rol = interaction.guild.roles.cache.get(rolPartnerId);
             if (!rol) return interaction.reply({ content: "❌ El rol de partner no existe.", ephemeral: true });
-
             if (member.roles.cache.has(rolPartnerId)) {
                 await member.roles.remove(rolPartnerId);
                 return interaction.reply({ content: "✅ Se te ha quitado el rol de **Partner**.", ephemeral: true });
@@ -337,44 +311,25 @@ if (interaction.customId === "boton_pago_mp") {
         if (customId === "copiar_cvu") return interaction.reply({ content: "0000003100072461415651", ephemeral: true });
         if (customId === "copiar_alias") return interaction.reply({ content: "710shop", ephemeral: true });
 
-        // --- LÓGICA ASUMIR TICKET CON LOGS ---
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-            
             updateRanking(user.id, user.tag);
-
             await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
             await channel.setName(`atendido-${user.username}`).catch(() => {});
-            
-            const embedAsumir = new MessageEmbed()
-                .setTitle("📌 Ticket Asumido")
-                .setColor("PURPLE")
-                .setDescription(`Un miembro del staff ha tomado el control de un ticket.`)
-                .addFields(
-                    { name: "👷 Staff", value: `${user.tag} (${user.id})`, inline: true },
-                    { name: "🎫 Ticket", value: `${channel.name}`, inline: true },
-                    { name: "🔗 Canal", value: `${channel}`, inline: false }
-                )
-                .setTimestamp()
-                .setFooter({ text: "710 | Machine Logs" });
-
+            const embedAsumir = new MessageEmbed().setTitle("📌 Ticket Asumido").setColor("PURPLE").setDescription(`Un miembro del staff ha tomado el control.`).addFields({ name: "👷 Staff", value: `${user.tag}`, inline: true }).setTimestamp();
             enviarLog(embedAsumir);
         }
 
         if (customId === "notificar") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
             const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
-            if (targetId) {
-                return interaction.reply({ content: `🔔 <@${targetId}>, el Staff está esperando tu respuesta para continuar con el proceso.` });
-            } else {
-                return interaction.reply({ content: "📢 ¡Atención! El Staff solicita tu presencia en este ticket." });
-            }
+            return interaction.reply({ content: targetId ? `🔔 <@${targetId}>, el Staff espera tu respuesta.` : "📢 ¡Atención! El Staff solicita tu presencia." });
         }
 
         if (customId === "fechar_ticket") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
             const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
-            const inputNota = new TextInputComponent().setCustomId('nota_staff').setLabel("Deja una nota para el usuario").setPlaceholder("Ej: Gracias por tu compra!").setStyle('PARAGRAPH').setRequired(false);
+            const inputNota = new TextInputComponent().setCustomId('nota_staff').setLabel("Deja una nota").setStyle('PARAGRAPH').setRequired(false);
             modalNota.addComponents(new MessageActionRow().addComponents(inputNota));
             return await interaction.showModal(modalNota);
         }
@@ -383,73 +338,54 @@ if (interaction.customId === "boton_pago_mp") {
             const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
             modal.addComponents(
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_prod').setLabel("¿Que deseas comprar?").setStyle('SHORT').setRequired(true)),
-                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Que metodos de pagos usaras?").setStyle('SHORT').setRequired(true)),
-                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_cant').setLabel("¿Cantidad que deseas comprar?").setStyle('SHORT').setRequired(true))
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Que metodos de pagos?").setStyle('SHORT').setRequired(true)),
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_cant').setLabel("¿Cantidad?").setStyle('SHORT').setRequired(true))
             );
             return await interaction.showModal(modal);
         }
+        
         if (customId === "ticket_soporte") {
             const modal = new Modal().setCustomId('modal_soporte').setTitle('Centro de Soporte');
             modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿En que necesitas Ayuda?").setStyle('PARAGRAPH').setRequired(true)));
             return await interaction.showModal(modal);
         }
+        
         if (customId === "ticket_partner") {
             const modal = new Modal().setCustomId('modal_partner').setTitle('Solicitud de Partner');
             modal.addComponents(
                 new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_add').setLabel("Ya añadiste nuestro add?").setStyle('SHORT').setRequired(true)),
-                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_link').setLabel("Manda aqui el link de tu server").setStyle('SHORT').setRequired(true))
+                new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_link').setLabel("Link de tu server").setStyle('SHORT').setRequired(true))
             );
             return await interaction.showModal(modal);
         }
     }
 
-    // --- LÓGICA DE MODALES ---
+    // --- 5. LÓGICA DE MODALES ---
     if (interaction.isModalSubmit()) {
         if (interaction.customId === 'modal_generar_2fa') {
             const secret = interaction.fields.getTextInputValue('clave_secreta').replace(/\s/g, '');
             try {
                 const token = otplib.authenticator.generate(secret);
-                return interaction.reply({ 
-                    content: `🔑 Tu código Rockstar 2FA actual es: **${token}**\n*(Expira en 30 segundos)*`, 
-                    ephemeral: true 
-                });
+                return interaction.reply({ content: `🔑 Código 2FA: **${token}**`, ephemeral: true });
             } catch (err) {
-                return interaction.reply({ 
-                    content: "❌ La clave secreta introducida no es válida. Asegúrate de que sea una clave base32 correcta.", 
-                    ephemeral: true 
-                });
+                return interaction.reply({ content: "❌ Clave inválida.", ephemeral: true });
             }
         }
 
         if (interaction.customId === 'modal_embed_personalizado') {
             const titulo = interaction.fields.getTextInputValue('titulo');
             const desc = interaction.fields.getTextInputValue('desc');
-            const thumb = interaction.fields.getTextInputValue('thumbnail');
-            const banner = interaction.fields.getTextInputValue('banner');
             const color = interaction.fields.getTextInputValue('cor');
-
-            const embedFinal = new MessageEmbed()
-                .setDescription(desc)
-                .setColor(color.startsWith('#') ? color : `#${color}`);
-
+            const embedFinal = new MessageEmbed().setDescription(desc).setColor(color.startsWith('#') ? color : `#${color}`);
             if (titulo) embedFinal.setTitle(titulo);
-            if (thumb && thumb.startsWith('http')) embedFinal.setThumbnail(thumb);
-            if (banner && banner.startsWith('http')) embedFinal.setImage(banner);
-
-            const rowCompra = new MessageActionRow().addComponents(
-                new MessageButton()
-                    .setLabel('🛒 Compra Aqui / Buy Here')
-                    .setStyle('LINK')
-                    .setURL('https://discord.com/channels/1469595804598501396/1469941913703350352') 
-            );
-
+            const rowCompra = new MessageActionRow().addComponents(new MessageButton().setLabel('🛒 Compra Aqui').setStyle('LINK').setURL('https://discord.com/channels/1469595804598501396/1469941913703350352'));
             await interaction.channel.send({ embeds: [embedFinal], components: [rowCompra] });
-            return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
+            return interaction.reply({ content: "✅ Enviado.", ephemeral: true });
         }
 
         if (interaction.customId === 'modal_nota_cierre') {
             await interaction.deferReply({ ephemeral: true });
-            const notaStaff = interaction.fields.getTextInputValue('nota_staff') || "No se proporcionaron notas adicionales.";
+            const notaStaff = interaction.fields.getTextInputValue('nota_staff') || "No hay notas.";
             const { channel, user, guild } = interaction;
             try {
                 const targetId = channel.permissionOverwrites.cache.filter(p => p.type === 'member' && p.id !== client.user.id).first()?.id;
@@ -457,56 +393,16 @@ if (interaction.customId === "boton_pago_mp") {
                 const attachment = await transcripts.createTranscript(channel, { limit: -1, fileName: `transcript-${channel.name}.html`, poweredBy: false });
 
                 if (targetUser) {
-                    const embedInfo = new MessageEmbed()
-                        .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
-                        .setTitle(`📑 Ticket Cerrado`)
-                        .setColor("#2f3136")
-                        .setDescription("Este ticket ha sido cerrado correctamente y su transcripción fue enviada.")
-                        .addFields(
-                            { name: "👤 Ticket Abierto Por", value: `<@${targetUser.id}>`, inline: true },
-                            { name: "🛠️ Ticket Cerrado Por", value: `<@${user.id}>`, inline: true },
-                            { name: "🕒 Fecha de cierre", value: `\`${moment().format('dddd, D [de] MMMM [de] YYYY, HH:mm')}\``, inline: true },
-                            { name: "📄 Nota", value: `\`\`\`${notaStaff}\`\`\`` }
-                        )
-                        .setFooter({ text: '710 | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
-
-                    const embedEncuesta = new MessageEmbed()
-                        .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
-                        .setTitle("📝 Encuesta de Satisfacción - Soporte Automático")
-                        .setColor("#2f3136")
-                        .setDescription(`Tu ticket fue cerrado correctamente. Agradecemos tu tiempo, por favor califica tu experiencia.`)
-                        .addFields(
-                            { name: "🎫 Ticket", value: `\`${channel.name}\``, inline: true },
-                            { name: "📁 Canal", value: `\`#${channel.name}\``, inline: true },
-                            { name: "👷 Staff", value: `<@${user.id}>`, inline: true }
-                        )
-                        .setFooter({ text: '710 | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
-
+                    const embedInfo = new MessageEmbed().setTitle(`📑 Ticket Cerrado`).setDescription(`Nota: ${notaStaff}`).setTimestamp();
                     const rowEncuesta = new MessageActionRow().addComponents(
-                        new MessageSelectMenu()
-                            .setCustomId(`calificar_staff_${user.id}`)
-                            .setPlaceholder('Selecciona tu calificación (1-5)')
-                            .addOptions([
-                                { label: '5 Estrellas', value: '5', emoji: '⭐' },
-                                { label: '4 Estrellas', value: '4', emoji: '⭐' },
-                                { label: '3 Estrellas', value: '3', emoji: '⭐' },
-                                { label: '2 Estrellas', value: '2', emoji: '⭐' },
-                                { label: '1 Estrella', value: '1', emoji: '⭐' }
-                            ])
+                        new MessageSelectMenu().setCustomId(`calificar_staff_${user.id}`).setPlaceholder('Califica (1-5)')
+                        .addOptions([{ label: '5 Estrellas', value: '5', emoji: '⭐' }, { label: '1 Estrella', value: '1', emoji: '⭐' }])
                     );
-
-                    await targetUser.send({ 
-                        content: `Tu ticket (\`${channel.name}\`) ha sido cerrado. Aquí tienes la transcripción:`, 
-                        embeds: [embedInfo, embedEncuesta], 
-                        files: [attachment], 
-                        components: [rowEncuesta] 
-                    }).catch(() => {});
+                    await targetUser.send({ content: `Ticket cerrado.`, embeds: [embedInfo], files: [attachment], components: [rowEncuesta] }).catch(() => {});
                 }
-
                 const canalTrans = guild.channels.cache.get(canalTranscriptsId);
                 if (canalTrans) await canalTrans.send({ content: `Transcripción: **${channel.name}**`, files: [attachment] });
-
-                await interaction.editReply("✅ Ticket finalizado y reporte enviado al usuario.");
+                await interaction.editReply("✅ Ticket cerrado.");
                 setTimeout(() => channel.delete().catch(() => {}), 3000);
             } catch (e) { console.error(e); }
             return;
@@ -518,10 +414,7 @@ if (interaction.customId === "boton_pago_mp") {
             
             if (interaction.customId === 'modal_compra') {
                 cateId = CATEGORIAS.COMPRA; tipoTicket = "Compra"; nombreCanal = `🛒-buy-${interaction.user.username}`;
-                camposExtra = [
-                    { name: '📦 Producto', value: `\`${interaction.fields.getTextInputValue('p_prod')}\``, inline: true },
-                    { name: '💳 Método', value: `\`${interaction.fields.getTextInputValue('p_metodo')}\``, inline: true }
-                ];
+                camposExtra = [{ name: '📦 Producto', value: `\`${interaction.fields.getTextInputValue('p_prod')}\``, inline: true }];
             } else if (interaction.customId === 'modal_soporte') {
                 cateId = CATEGORIAS.SOPORTE; tipoTicket = "Soporte"; nombreCanal = `🛠️-soporte-${interaction.user.username}`;
                 camposExtra = [{ name: '❓ Ayuda', value: `\`${interaction.fields.getTextInputValue('p_duda')}\``, inline: false }];
@@ -540,33 +433,16 @@ if (interaction.customId === "boton_pago_mp") {
                     ]
                 });
 
-                const ticketID = Math.floor(Math.random() * 9000000000) + 1000000000;
-                const embedTicket = new MessageEmbed()
-                    .setColor('#3b5998')
-                    .setAuthor({ name: '710 Bot Shop', iconURL: interaction.guild.iconURL() })
-                    .setTitle('SISTEMA DE TICKETS')
-                    .setThumbnail(interaction.user.displayAvatarURL())
-                    .setDescription(`¡Bienvenido/a ${interaction.user}! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
-                    .addFields(
-                        { name: 'Categoría', value: `\`${tipoTicket}\``, inline: true },
-                        { name: 'ID del Ticket', value: `\`${ticketID}\``, inline: true },
-                        { name: 'Fecha', value: `\`${moment().format('D/MM/YYYY HH:mm')}\``, inline: true },
-                        { name: 'Usuario', value: `\`${interaction.user.username}\` (${interaction.user.id})`, inline: false }
-                    )
-                    .addFields(camposExtra)
-                    .setFooter({ text: '710 Shop - Gestión de Tickets' })
-                    .setTimestamp();
-
+                const embedTicket = new MessageEmbed().setTitle('SISTEMA DE TICKETS').setDescription(`¡Bienvenido/a ${interaction.user}!`).addFields(camposExtra).setTimestamp();
                 const row = new MessageActionRow().addComponents(
-    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-    new MessageButton().setCustomId("metodos_pago").setLabel("Métodos de Pago").setStyle("PRIMARY").setEmoji("💳"), // Botón actualizado
-    new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
-);
+                    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
+                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                    new MessageButton().setCustomId("metodos_pago").setLabel("Métodos de Pago").setStyle("PRIMARY").setEmoji("💳"),
+                    new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
+                );
 
                 await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}> Staff 👥`, embeds: [embedTicket], components: [row] });
                 await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
-                enviarLog(new MessageEmbed().setTitle("🎫 Ticket Creado").setColor("BLUE").setDescription(`**Usuario:** ${interaction.user.tag}\n**Canal:** ${canal}\n**Tipo:** ${tipoTicket}`).setTimestamp());
             } catch (e) { console.error(e); }
         }
     }
