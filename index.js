@@ -1,11 +1,4 @@
 require('dotenv').config(); 
-// Nueva forma de importar Mercado Pago (SDK v2)
-const { MercadoPagoConfig, Preference } = require('mercadopago');
-
-// Configuración del cliente de Mercado Pago
-const clientMP = new MercadoPagoConfig({ 
-    accessToken: process.env.ACCESS_TOKEN_MP 
-});
 
 const { 
     Client, 
@@ -27,6 +20,8 @@ const otplib = require('otplib');
 
 // Carga de configuración
 const config = require('./DataBaseJson/config.json');
+
+// ... (El resto de tu código)S
 
 moment.locale('es');
 
