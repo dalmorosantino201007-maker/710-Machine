@@ -1,30 +1,50 @@
-const { MessageEmbed } = require('discord.js');
-const fs = require('fs');
+const Discord = require("discord.js");
+const fs = require("fs");
+const path = require("path");
+
+// Asegúrate de que esta ruta sea exacta a la de tu addtickets
+const dbPath = path.resolve(__dirname, "../../DataBaseJson/staff.json");
 
 module.exports = {
-    name: "rankingstaff",
-    description: "Muestra el top de Staff con más tickets asumidos",
-    run: async (client, interaction) => {
-        const rankingPath = './DataBaseJson/ranking.json';
-        if (!fs.existsSync(rankingPath)) return interaction.reply({ content: "📭 No hay datos registrados.", ephemeral: true });
+  name: "rankingstaff",
+  description: "🏆 | Muestra el ranking de tickets del staff.",
 
-        const ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
-        const sorted = Object.entries(ranking)
-            .sort(([, a], [, b]) => b.tickets - a.tickets)
-            .slice(0, 10);
+  run: async (client, interaction) => {
+    await interaction.deferReply();
 
-        if (sorted.length === 0) return interaction.reply({ content: "📭 Ranking vacío.", ephemeral: true });
-
-        const description = sorted.map(([id, data], index) => {
-            return `**${index + 1}.** <@${id}> — \`${data.tickets}\` tickets`;
-        }).join('\n');
-
-        const embed = new MessageEmbed()
-            .setTitle("🏆 Ranking de Staff")
-            .setColor("GOLD")
-            .setDescription(description)
-            .setTimestamp();
-
-        return interaction.reply({ embeds: [embed] });
+    // 1. Leer la base de datos
+    if (!fs.existsSync(dbPath)) {
+      return interaction.editReply({ content: "❌ Aún no hay registros en el ranking." });
     }
+
+    const staffData = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+    
+    // 2. Convertir el objeto en una lista y filtrar los que tengan 0 tickets
+    const rankingArray = Object.keys(staffData)
+      .map(id => ({ id, ...staffData[id] }))
+      .filter(staff => staff.tickets > 0)
+      .sort((a, b) => b.tickets - a.tickets); // Ordenar de mayor a menor
+
+    if (rankingArray.length === 0) {
+      return interaction.editReply({ content: "📬 Aún no hay registros en el ranking." });
+    }
+
+    // 3. Crear el mensaje del ranking (Top 10)
+    const top10 = rankingArray.slice(0, 10);
+    let description = "";
+
+    top10.forEach((staff, index) => {
+      const medalla = index === 0 ? "🥇" : index === 1 ? "🥈" : index === 2 ? "🥉" : "👤";
+      description += `${medalla} **#${index + 1}** | <@${staff.id}> - \`${staff.tickets}\` tickets\n`;
+    });
+
+    const embed = new Discord.MessageEmbed()
+      .setTitle("🏆 Ranking de Staff - Tickets")
+      .setDescription(description)
+      .setColor("GOLD")
+      .setFooter({ text: "710 - Machine System", iconURL: client.user.displayAvatarURL() })
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [embed] });
+  },
 };
