@@ -90,70 +90,55 @@ const enviarLog = (embed) => {
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
-    // --- LÓGICA DE MÉTODOS DE PAGO ---
     
-    // 1. Al presionar el botón "Métodos de Pago"
-    if (interaction.isButton() && interaction.customId === 'metodos_pago') {
-        const rowMenu = new MessageActionRow().addComponents(
-            new MessageSelectMenu()
-                .setCustomId('menu_metodos')
-                .setPlaceholder('💳 Elige tu método de pago')
-                .addOptions([
-                    {
-                        label: 'Mercado Pago',
-                        value: 'pago_mp',
-                        emoji: '💳',
-                        description: 'Transferencias Argentina (CVU/Alias)'
-                    },
-                    {
-                        label: 'PayPal',
-                        value: 'pago_paypal',
-                        emoji: '💙',
-                        description: 'Pagos internacionales (la710storeshop@gmail.com)'
-                    }
-                ])
-        );
-
-        return interaction.reply({ 
-            content: 'Selecciona una opción para ver los datos:', 
-            components: [rowMenu], 
-            ephemeral: true 
-        });
+    // --- 1. BOTONES (MÉTODOS DE PAGO, ASUMIR, CERRAR) ---
+    if (interaction.isButton()) {
+        if (interaction.customId === 'metodos_pago') {
+            const rowMenu = new MessageActionRow().addComponents(
+                new MessageSelectMenu()
+                    .setCustomId('menu_metodos')
+                    .setPlaceholder('💳 Elige tu método de pago')
+                    .addOptions([
+                        { label: 'Mercado Pago', value: 'pago_mp', emoji: '💳', description: 'Transferencias Argentina' },
+                        { label: 'PayPal', value: 'pago_paypal', emoji: '💙', description: 'la710storeshop@gmail.com' }
+                    ])
+            );
+            return interaction.reply({ content: 'Selecciona una opción:', components: [rowMenu], ephemeral: true });
+        }
+        
+        // Aquí irían tus otros botones como 'asumir' o 'fechar_ticket'
     }
 
-    // 2. Al seleccionar una opción del menú
+    // --- 2. MENÚS DE SELECCIÓN ---
     if (interaction.isSelectMenu() && interaction.customId === 'menu_metodos') {
         const seleccion = interaction.values[0];
-
         if (seleccion === 'pago_mp') {
             const embedMP = new MessageEmbed()
-                .setTitle("💳 Pago vía Mercado Pago")
-                .setColor("BLUE")
-                .setDescription("Datos para realizar tu transferencia:")
+                .setTitle("💳 Pago vía Mercado Pago").setColor("BLUE")
                 .addFields(
                     { name: "• CVU:", value: "```0000003100072461415651```" },
                     { name: "• Alias:", value: "```710shop```" },
                     { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```" }
-                )
-                .setFooter({ text: "Envía el comprobante en este ticket." });
-
+                );
             return interaction.update({ content: null, embeds: [embedMP], components: [] });
         }
 
         if (seleccion === 'pago_paypal') {
             const embedPP = new MessageEmbed()
-                .setTitle("💙 Pago vía PayPal")
-                .setColor("BLUE")
-                .setDescription("Datos para realizar tu pago internacional:")
-                .addFields(
-                    { name: "• Correo:", value: "```la710storeshop@gmail.com```" },
-                    { name: "• Importante:", value: "Enviar como 'Amigos y Familiares' para evitar retenciones." }
-                )
-                .setFooter({ text: "Envía captura del pago aquí." });
-
+                .setTitle("💙 Pago vía PayPal").setColor("BLUE")
+                .addFields({ name: "• Correo:", value: "```la710storeshop@gmail.com```" });
             return interaction.update({ content: null, embeds: [embedPP], components: [] });
         }
     }
+
+    // --- 3. COMANDOS SLASH ---
+    if (interaction.isCommand()) {
+        // Aquí va tu lógica de renvembed, clearpanel, etc.
+        if (interaction.commandName === "renvembed") {
+            // ... tu código ...
+        }
+    }
+});
     // --- LÓGICA DE COMANDOS ---
     if (interaction.isCommand()) {
         if (interaction.commandName === "renvembed") {
