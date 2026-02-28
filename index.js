@@ -128,7 +128,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor("#f39c12")
                 .setDescription("¿Quieres limpiar todos los mensajes del bot en tus DMs?\n\n⚠️ **IMPORTANTE:** El bot solo puede borrar sus propios mensajes, no los tuyos.")
                 .addFields({ name: "Acción", value: "Presiona el botón de abajo para empezar la limpieza automática." })
-                .setFooter({ text: "Host | Machine Services" });
+                .setFooter({ text: " 710 | Machine Services" });
 
             const rowClear = new MessageActionRow().addComponents(
                 new MessageButton()
@@ -144,7 +144,7 @@ client.on('interactionCreate', async (interaction) => {
         // --- NUEVO: COMANDO /COMANDLIST ---
         if (interaction.commandName === "comandlist") {
             const embedList = new MessageEmbed()
-                .setTitle("📜 Lista de Comandos - Host | Machine")
+                .setTitle("📜 Lista de Comandos - 710 | Machine")
                 .setColor("#2f3136")
                 .setDescription("Aquí tienes la lista completa de comandos y sus permisos:")
                 .addFields(
@@ -178,7 +178,7 @@ client.on('interactionCreate', async (interaction) => {
                 .setColor("GOLD")
                 .setDescription(description)
                 .setTimestamp()
-                .setFooter({ text: "Host | Machine Ranking" });
+                .setFooter({ text: "710 | Machine Ranking" });
 
             return interaction.reply({ embeds: [embedRank] });
         }
@@ -203,7 +203,7 @@ client.on('interactionCreate', async (interaction) => {
         const nota = interaction.values[0];
         const estrellas = "⭐".repeat(parseInt(nota));
         const embedReview = new MessageEmbed()
-            .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
+            .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
             .setTitle("🌟 Nueva Calificación de Servicio")
             .setColor("GOLD")
             .addFields(
@@ -311,7 +311,7 @@ if (interaction.customId === "boton_pago_mp") {
                     { name: "🔗 Canal", value: `${channel}`, inline: false }
                 )
                 .setTimestamp()
-                .setFooter({ text: "Host | Machine Logs" });
+                .setFooter({ text: "710 | Machine Logs" });
 
             enviarLog(embedAsumir);
         }
@@ -413,7 +413,7 @@ if (interaction.customId === "boton_pago_mp") {
 
                 if (targetUser) {
                     const embedInfo = new MessageEmbed()
-                        .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
+                        .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
                         .setTitle(`📑 Ticket Cerrado`)
                         .setColor("#2f3136")
                         .setDescription("Este ticket ha sido cerrado correctamente y su transcripción fue enviada.")
@@ -423,10 +423,10 @@ if (interaction.customId === "boton_pago_mp") {
                             { name: "🕒 Fecha de cierre", value: `\`${moment().format('dddd, D [de] MMMM [de] YYYY, HH:mm')}\``, inline: true },
                             { name: "📄 Nota", value: `\`\`\`${notaStaff}\`\`\`` }
                         )
-                        .setFooter({ text: 'Host | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
+                        .setFooter({ text: '710 | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
 
                     const embedEncuesta = new MessageEmbed()
-                        .setAuthor({ name: 'Host | Machine', iconURL: client.user.displayAvatarURL() })
+                        .setAuthor({ name: '710 | Machine', iconURL: client.user.displayAvatarURL() })
                         .setTitle("📝 Encuesta de Satisfacción - Soporte Automático")
                         .setColor("#2f3136")
                         .setDescription(`Tu ticket fue cerrado correctamente. Agradecemos tu tiempo, por favor califica tu experiencia.`)
@@ -435,7 +435,7 @@ if (interaction.customId === "boton_pago_mp") {
                             { name: "📁 Canal", value: `\`#${channel.name}\``, inline: true },
                             { name: "👷 Staff", value: `<@${user.id}>`, inline: true }
                         )
-                        .setFooter({ text: 'Host | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
+                        .setFooter({ text: '710 | Sistema de Tickets', iconURL: client.user.displayAvatarURL() });
 
                     const rowEncuesta = new MessageActionRow().addComponents(
                         new MessageSelectMenu()

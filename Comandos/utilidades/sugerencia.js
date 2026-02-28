@@ -35,7 +35,7 @@ module.exports = {
       .setDescription(`\`\`\`${suggestion}\`\`\``)
       .setThumbnail(user.displayAvatarURL({ dynamic: true }))
       .setFooter({
-        text: "Host | Sistema de Sugerencias",
+        text: "710 | Sistema de Sugerencias",
         iconURL: guild.iconURL({ dynamic: true }) || user.displayAvatarURL({ dynamic: true })
       })
       .setTimestamp();
@@ -57,13 +57,13 @@ module.exports = {
       await thread.send(`💬 ¡Discute aquí la sugerencia enviada por **${user.username}**!`);
 
       await interaction.reply({
-        content: "<:checkwhite:1374234754366570576> | ¡Tu sugerencia ha sido enviada!",
+        content: " | ¡Tu sugerencia ha sido enviada!",
         ephemeral: true,
       });
     } catch (err) {
       console.error("Error al enviar sugerencia:", err);
       return interaction.reply({
-        content: "<:crosshost2:1384349772386664550> | Hubo un error al enviar la sugerencia.",
+        content: " | Hubo un error al enviar la sugerencia.",
         ephemeral: true,
       });
     }
