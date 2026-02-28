@@ -155,7 +155,11 @@ client.on('interactionCreate', async (interaction) => {
     }
 
     // --- 3. LÓGICA DE COMANDOS (Ahora fuera de los if de menús) ---
-    if (interaction.isCommand()) {
+    // 🔥 BLOQUE CORREGIDO DE LÓGICA DE COMANDOS
+
+// --- 3. LÓGICA DE COMANDOS (Ahora correctamente estructurada) ---
+if (interaction.isChatInputCommand()) {
+
         if (interaction.commandName === "renvembed") {
             if (!interaction.member.roles.cache.has(rolAdminReenvio)) {
                 return interaction.reply({ content: "❌ No tienes el rango necesario para usar este comando.", ephemeral: true });
@@ -250,7 +254,7 @@ client.on('interactionCreate', async (interaction) => {
         const cmd = client.slashCommands.get(interaction.commandName);
         if (cmd) try { await cmd.run(client, interaction); } catch (e) { console.error(e); }
         return;
-    }
+}
 
     // --- 4. LÓGICA DE BOTONES (Resto de botones) ---
     if (interaction.isButton()) {
