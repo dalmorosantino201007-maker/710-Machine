@@ -90,6 +90,70 @@ const enviarLog = (embed) => {
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
+    // --- LÓGICA DE MÉTODOS DE PAGO ---
+    
+    // 1. Al presionar el botón "Métodos de Pago"
+    if (interaction.isButton() && interaction.customId === 'metodos_pago') {
+        const rowMenu = new MessageActionRow().addComponents(
+            new MessageSelectMenu()
+                .setCustomId('menu_metodos')
+                .setPlaceholder('💳 Elige tu método de pago')
+                .addOptions([
+                    {
+                        label: 'Mercado Pago',
+                        value: 'pago_mp',
+                        emoji: '💳',
+                        description: 'Transferencias Argentina (CVU/Alias)'
+                    },
+                    {
+                        label: 'PayPal',
+                        value: 'pago_paypal',
+                        emoji: '💙',
+                        description: 'Pagos internacionales (la710storeshop@gmail.com)'
+                    }
+                ])
+        );
+
+        return interaction.reply({ 
+            content: 'Selecciona una opción para ver los datos:', 
+            components: [rowMenu], 
+            ephemeral: true 
+        });
+    }
+
+    // 2. Al seleccionar una opción del menú
+    if (interaction.isSelectMenu() && interaction.customId === 'menu_metodos') {
+        const seleccion = interaction.values[0];
+
+        if (seleccion === 'pago_mp') {
+            const embedMP = new MessageEmbed()
+                .setTitle("💳 Pago vía Mercado Pago")
+                .setColor("BLUE")
+                .setDescription("Datos para realizar tu transferencia:")
+                .addFields(
+                    { name: "• CVU:", value: "```0000003100072461415651```" },
+                    { name: "• Alias:", value: "```710shop```" },
+                    { name: "• Titular:", value: "```Santino Bautista Dal Moro Urbani```" }
+                )
+                .setFooter({ text: "Envía el comprobante en este ticket." });
+
+            return interaction.update({ content: null, embeds: [embedMP], components: [] });
+        }
+
+        if (seleccion === 'pago_paypal') {
+            const embedPP = new MessageEmbed()
+                .setTitle("💙 Pago vía PayPal")
+                .setColor("BLUE")
+                .setDescription("Datos para realizar tu pago internacional:")
+                .addFields(
+                    { name: "• Correo:", value: "```la710storeshop@gmail.com```" },
+                    { name: "• Importante:", value: "Enviar como 'Amigos y Familiares' para evitar retenciones." }
+                )
+                .setFooter({ text: "Envía captura del pago aquí." });
+
+            return interaction.update({ content: null, embeds: [embedPP], components: [] });
+        }
+    }
     // --- LÓGICA DE COMANDOS ---
     if (interaction.isCommand()) {
         if (interaction.commandName === "renvembed") {
@@ -508,11 +572,11 @@ if (interaction.customId === "boton_pago_mp") {
                     .setTimestamp();
 
                 const row = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-                    new MessageButton().setCustomId("boton_pago_mp").setLabel("Mercado Pago").setStyle("PRIMARY").setEmoji("💳"),
-                    new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
-                );
+    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
+    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+    new MessageButton().setCustomId("metodos_pago").setLabel("Métodos de Pago").setStyle("PRIMARY").setEmoji("💳"), // Botón actualizado
+    new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
+);
 
                 await canal.send({ content: `${interaction.user} | <@&${rolPermitidoId}> Staff 👥`, embeds: [embedTicket], components: [row] });
                 await interaction.editReply({ content: `✅ Ticket creado: ${canal}` });
