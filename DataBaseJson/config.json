@@ -20,17 +20,17 @@
         "moneda": "ARS"
     },
     "ticket": {
-        "ticket1": {
+        "opc1": {
             "nome": "Compra",
             "desc": " Buy Products",
             "categoria": "1469945642909438114"
         },
-        "ticket2": {
+        "opc2": {
             "nome": "Soporte",
             "desc": "Receive support for any product purchased from Host",
             "categoria": "1469621686155346042"
         },
-        "ticket3": {
+        "opc3": {
             "nome": "Partner",
             "desc": "Be a Host Partner",
             "categoria": "1471010330229477528"

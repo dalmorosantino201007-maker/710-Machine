@@ -24,14 +24,14 @@ moment.locale('es');
 // --- 🗄️ BASE DE DATOS ---
 const db = new sqlite3.Database('./DataBaseJson/tickets.db');
 db.serialize(() => {
-    db.run(`CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, creatorId TEXT)`);
-    db.run(`CREATE TABLE IF NOT EXISTS conteo_tickets (total INTEGER)`);
-    db.get(`SELECT total FROM conteo_tickets`, (err, row) => {
-        if (!row) db.run(`INSERT INTO conteo_tickets (total) VALUES (0)`);
-    });
+    // Añadimos la columna channelId para que el bot reconozca tickets tras reiniciarse
+    db.run(`CREATE TABLE IF NOT EXISTS tickets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, 
+        creatorId TEXT, 
+        channelId TEXT,
+        claimedBy TEXT
+    )`);
 });
-
-const estadoTickets = {}; 
 
 const client = new Client({
     intents: [
@@ -69,7 +69,7 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 👋 EVENTO: BIENVENIDAS (ESTILO SOLICITADO)
+// 👋 EVENTO: BIENVENIDAS
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
     const canal = member.guild.channels.cache.get(canalWelcomeId) || await member.guild.channels.fetch(canalWelcomeId).catch(() => null);
@@ -102,12 +102,10 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE (TICKETS + 2FA)
+// 🕹️ EVENTO: INTERACTION CREATE
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        const ticketId = interaction.channel?.id;
-
         if (interaction.isCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             if (command) return await command.run(client, interaction);
@@ -129,40 +127,32 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (interaction.isModalSubmit()) {
-            if (interaction.customId === 'modal_auth_2fa') {
-                const secret = interaction.fields.getTextInputValue('secret_input').replace(/\s+/g, '');
-                try {
-                    const token = authenticator.generate(secret);
-                    return interaction.reply({ content: `🔑 Código: \`${token}\``, ephemeral: true });
-                } catch (e) { return interaction.reply({ content: "❌ Key inválida.", ephemeral: true }); }
-            }
-
             if (interaction.customId.startsWith("modal_")) {
                 const opc = interaction.customId;
                 let nome, categoria, ticketKey, respuestas = [];
 
                 if (opc === "modal_opc1") {
-                    nome = `🛒・compra-${interaction.user.username}`;
+                    nome = `🛒・${interaction.user.username}`;
                     categoria = CATEGORIAS.COMPRA;
-                    ticketKey = "ticket1";
+                    ticketKey = "Compra";
                     respuestas = [
                         { name: "🛒 Producto:", value: interaction.fields.getTextInputValue("producto") },
                         { name: "💳 Método de pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
                         { name: "📄 Cantidad:", value: interaction.fields.getTextInputValue("cantidad_compra") }
                     ];
                 } else if (opc === "modal_opc2") {
-                    nome = `🛠・soporte-${interaction.user.username}`;
+                    nome = `🛠・${interaction.user.username}`;
                     categoria = CATEGORIAS.SOPORTE;
-                    ticketKey = "ticket2";
+                    ticketKey = "Soporte";
                     respuestas = [
                         { name: "🔨 Producto:", value: interaction.fields.getTextInputValue("producto") },
                         { name: "⚠️ Problema:", value: interaction.fields.getTextInputValue("problema") },
                         { name: "📄 Info adicional:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
                     ];
                 } else if (opc === "modal_opc3") {
-                    nome = `🤝・partner-${interaction.user.username}`;
+                    nome = `🤝・${interaction.user.username}`;
                     categoria = CATEGORIAS.PARTNER;
-                    ticketKey = "ticket3";
+                    ticketKey = "Partner";
                     respuestas = [
                         { name: "🌐 Servidor:", value: interaction.fields.getTextInputValue("servidor") },
                         { name: "👥 ¿+250 Miembros?:", value: interaction.fields.getTextInputValue("miembros") },
@@ -170,111 +160,136 @@ client.on('interactionCreate', async (interaction) => {
                     ];
                 }
 
-                const existing = interaction.guild.channels.cache.find(c => estadoTickets[c.id]?.creadorId === interaction.user.id);
-                if (existing) return interaction.reply({ content: `⚠️ Ya tienes un ticket: ${existing}`, ephemeral: true });
+                // Verificar si ya tiene un ticket abierto en la DB
+                db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
+                    if (row && interaction.guild.channels.cache.has(row.channelId)) {
+                        return interaction.reply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>`, ephemeral: true });
+                    }
 
-                const ch = await interaction.guild.channels.create(nome, {
-                    parent: categoria,
-                    permissionOverwrites: [
-                        { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
-                        { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES', 'EMBED_LINKS'] },
-                        { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
-                    ]
-                });
+                    const ch = await interaction.guild.channels.create(nome, {
+                        type: 'GUILD_TEXT',
+                        parent: categoria,
+                        permissionOverwrites: [
+                            { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
+                            { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES', 'EMBED_LINKS'] },
+                            { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
+                        ]
+                    });
 
-                db.run(`INSERT INTO tickets (creatorId) VALUES (?)`, [interaction.user.id], function(err) {
-                    const ticketDbId = this.lastID;
-                    estadoTickets[ch.id] = { creadorId: interaction.user.id, reclamado: false, fechaCreacion: new Date(), ticketId: ticketDbId };
-                    
-                    const embedTicket = new MessageEmbed()
-                        .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
-                        .addFields(
-                            { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
-                            { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
-                            { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
-                        ).setTimestamp();
+                    db.run(`INSERT INTO tickets (creatorId, channelId) VALUES (?, ?)`, [interaction.user.id, ch.id], function(err) {
+                        const ticketDbId = this.lastID;
+                        
+                        const embedTicket = new MessageEmbed()
+                            .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
+                            .addFields(
+                                { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
+                                { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
+                                { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
+                            ).setTimestamp();
 
-                    const controlButtons = new MessageActionRow().addComponents(
-                        new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
-                        new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
-                        new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
-                    );
+                        const controlButtons = new MessageActionRow().addComponents(
+                            new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
+                            new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
+                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
+                        );
 
-                    ch.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [controlButtons] });
-                    ch.send({ embeds: [new MessageEmbed().setTitle("📋 Respuestas").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
-                    interaction.reply({ content: `✅ Ticket creado: ${ch}`, ephemeral: true });
+                        ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] });
+                        ch.send({ embeds: [new MessageEmbed().setTitle("📋 Datos del Formulario").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
+                        interaction.reply({ content: `✅ Ticket creado con éxito: ${ch}`, ephemeral: true });
+                    });
                 });
             }
         }
 
         if (interaction.isButton()) {
             const opc = interaction.customId;
-            const ticket = estadoTickets[ticketId];
 
+            // Lógica de apertura de Modales
             if (opc === "opc1") {
-                const m1 = new Modal().setCustomId("modal_opc1").setTitle("Compras");
+                const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("metodo_pago").setLabel("Método de pago").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("cantidad_compra").setLabel("Cantidad").setStyle("SHORT"))
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("¿Qué deseas comprar?").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("metodo_pago").setLabel("Método de pago").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("cantidad_compra").setLabel("Cantidad").setStyle("SHORT").setRequired(true))
                 );
                 return await interaction.showModal(m1);
             }
             if (opc === "opc2") {
-                const m2 = new Modal().setCustomId("modal_opc2").setTitle("Soporte");
+                const m2 = new Modal().setCustomId("modal_opc2").setTitle("Formulario de Soporte");
                 m2.addComponents(
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("problema").setLabel("Problema").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("informacion_extra").setLabel("Info adicional").setStyle("PARAGRAPH").setRequired(false))
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto/Servicio").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("problema").setLabel("Describe el problema").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("informacion_extra").setLabel("Información adicional").setStyle("PARAGRAPH").setRequired(false))
                 );
                 return await interaction.showModal(m2);
             }
             if (opc === "opc3") {
-                const m3 = new Modal().setCustomId("modal_opc3").setTitle("Partner");
+                const m3 = new Modal().setCustomId("modal_opc3").setTitle("Formulario de Partner");
                 m3.addComponents(
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("servidor").setLabel("Link").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("miembros").setLabel("¿+250 Miembros?").setStyle("SHORT")),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("nuestroad").setLabel("¿Enviaste el Ad?").setStyle("SHORT"))
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("servidor").setLabel("Link del Servidor").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("miembros").setLabel("¿Cuántos miembros reales tiene?").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("nuestroad").setLabel("¿Publicaste nuestro Ad?").setStyle("SHORT").setRequired(true))
                 );
                 return await interaction.showModal(m3);
             }
 
-            if (!ticket) return;
+            // Lógica de botones DENTRO del ticket
+            db.get(`SELECT * FROM tickets WHERE channelId = ?`, [interaction.channel.id], async (err, ticket) => {
+                if (!ticket) return; // Si no es un canal de ticket, ignorar
 
-            if (opc === "claim_ticket") {
-                ticket.reclamado = true; ticket.reclamadorId = interaction.user.id;
-                return interaction.reply({ content: `✅ Ticket reclamado por ${interaction.user}` });
-            }
-            if (opc === "notify_ticket") {
-                const creador = await interaction.guild.members.fetch(ticket.creadorId).catch(() => null);
-                if (creador) creador.send(`🔔 Te esperan en tu ticket: ${interaction.channel}`).catch(() => {});
-                return interaction.reply({ content: "✅ Notificado", ephemeral: true });
-            }
-            if (opc === "fechar_ticket") {
-                await interaction.deferUpdate();
-                cerrarTicketFinal(interaction, ticket, "Cerrado");
-            }
+                if (opc === "claim_ticket") {
+                    if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el personal puede reclamar tickets.", ephemeral: true });
+                    if (ticket.claimedBy) return interaction.reply({ content: `⚠️ Este ticket ya fue reclamado por <@${ticket.claimedBy}>`, ephemeral: true });
+
+                    db.run(`UPDATE tickets SET claimedBy = ? WHERE channelId = ?`, [interaction.user.id, interaction.channel.id]);
+                    return interaction.reply({ content: `✅ Ticket reclamado por ${interaction.user}` });
+                }
+
+                if (opc === "notify_ticket") {
+                    const creador = await interaction.guild.members.fetch(ticket.creatorId).catch(() => null);
+                    if (creador) {
+                        creador.send(`🔔 **Atención:** El staff te está esperando en tu ticket: ${interaction.channel}`).catch(() => {});
+                        return interaction.reply({ content: "✅ Se ha enviado un MD al creador del ticket.", ephemeral: true });
+                    }
+                    return interaction.reply({ content: "❌ No pude enviar el mensaje (MDs cerrados).", ephemeral: true });
+                }
+
+                if (opc === "fechar_ticket") {
+                    if (!interaction.member.roles.cache.has(rolPermitidoId) && interaction.user.id !== ticket.creatorId) {
+                        return interaction.reply({ content: "❌ No tienes permiso para cerrar este ticket.", ephemeral: true });
+                    }
+                    await interaction.reply("🔒 Cerrando ticket en 5 segundos...");
+                    setTimeout(() => cerrarTicketFinal(interaction, ticket), 5000);
+                }
+            });
         }
     } catch (err) { console.error(err); }
 });
 
 // --- FUNCIÓN CIERRE ---
-async function cerrarTicketFinal(interaction, ticket, nota) {
-    const transcriptFile = await transcript.createTranscript(interaction.channel, { limit: -1, returnType: 'attachment' });
-    const embedCierre = new MessageEmbed()
-        .setTitle("📝 Ticket Cerrado").setColor("RED")
-        .addFields(
-            { name: '🎟️ Ticket', value: `\`${interaction.channel.name}\`` },
-            { name: '👤 Abierto por', value: `<@${ticket.creadorId}>` },
-            { name: '🔒 Cerrado por', value: `<@${interaction.user.id}>` }
-        ).setTimestamp();
+async function cerrarTicketFinal(interaction, ticket) {
+    try {
+        const attachment = await transcript.createTranscript(interaction.channel, {
+            limit: -1,
+            fileName: `transcript-${interaction.channel.name}.html`,
+            returnBuffer: false
+        });
 
-    const logChan = interaction.guild.channels.cache.get(canalTranscriptsId);
-    if (logChan) logChan.send({ embeds: [embedCierre], files: [transcriptFile] });
+        const embedCierre = new MessageEmbed()
+            .setTitle("📝 Ticket Finalizado")
+            .setColor("RED")
+            .addFields(
+                { name: '🎟️ Canal', value: `\`${interaction.channel.name}\``, inline: true },
+                { name: '👤 Creador', value: `<@${ticket.creatorId}>`, inline: true },
+                { name: '🔒 Cerrado por', value: `${interaction.user.tag}`, inline: true }
+            ).setTimestamp();
 
-    db.run(`DELETE FROM tickets WHERE id = ?`, [ticket.ticketId]);
-    delete estadoTickets[interaction.channel.id];
-    setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+        const logChan = interaction.guild.channels.cache.get(canalTranscriptsId);
+        if (logChan) await logChan.send({ embeds: [embedCierre], files: [attachment] });
+
+        db.run(`DELETE FROM tickets WHERE channelId = ?`, [interaction.channel.id]);
+        await interaction.channel.delete();
+    } catch (e) { console.error(e); }
 }
 
 // ==========================================
@@ -284,7 +299,7 @@ client.on('messageDelete', async (message) => {
     if (!message.guild || message.author?.bot) return;
     const embed = new MessageEmbed()
         .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto_"}`)
+        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto (posible imagen o embed)_"}`)
         .setColor("RED")
         .setTimestamp();
     enviarLog(embed);
@@ -300,24 +315,25 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     enviarLog(embed);
 });
 
-client.on('guildMemberRemove', async (member) => {
-    const embed = new MessageEmbed()
-        .setAuthor({ name: `Usuario salió`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
-        .setDescription(`${member.user.tag} ha abandonado el servidor.`)
-        .setColor("ORANGE")
-        .setTimestamp();
-    enviarLog(embed);
-});
-
 // --- READY ---
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - ONLINE`);
+    
+    // Auto-unirse al canal de voz si está configurado
     const guild = client.guilds.cache.get(ID_SERVIDOR);
     if (guild) {
         const voiceChannel = guild.channels.cache.get(canalVozId);
         if (voiceChannel) {
             const { joinVoiceChannel } = require('@discordjs/voice');
-            joinVoiceChannel({ channelId: voiceChannel.id, guildId: guild.id, adapterCreator: guild.voiceAdapterCreator, selfDeaf: true, selfMute: true });
+            try {
+                joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: guild.id,
+                    adapterCreator: guild.voiceAdapterCreator,
+                    selfDeaf: true,
+                    selfMute: true 
+                });
+            } catch (e) { console.error("Error al unirse al canal de voz:", e); }
         }
     }
 });
