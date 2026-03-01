@@ -60,6 +60,10 @@ cron.schedule('0 0 * * *', () => {
 client.slashCommands = new Collection();
 require('./handler')(client);
 
+const { MessageEmbed, MessageActionRow, MessageButton, Modal, TextInputComponent } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
 const canalLogsId = "1470928427199631412"; 
@@ -132,7 +136,6 @@ client.on('interactionCreate', async (interaction) => {
 
         // --- 2. LÓGICA DE BOTONES ---
         if (interaction.isButton()) {
-            // Botón de Mercado Pago
             if (customId === "boton_pago_mp" || customId === "metodos_pago") {
                 const embedBotonMP = new MessageEmbed()
                     .setTitle("💳 DATOS DE MERCADO PAGO")
@@ -145,7 +148,6 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ embeds: [embedBotonMP], ephemeral: true });
             }
 
-            // Abrir Modales
             if (customId === "ticket_compra") {
                 const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
                 modal.addComponents(
@@ -171,7 +173,6 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.showModal(modal);
             }
 
-            // Acciones Staff (Asumir, Cerrar, Notificar)
             if (customId === "asumir") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
                 await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
@@ -257,6 +258,9 @@ client.on('interactionCreate', async (interaction) => {
         }
     } catch (e) {
         console.error("Error en interacción:", e);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: "❌ Ocurrió un error al procesar la interacción.", ephemeral: true }).catch(() => {});
+        }
     }
 });
 
