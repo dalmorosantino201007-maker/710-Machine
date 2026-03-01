@@ -36,6 +36,8 @@ try {
 const rolPermitidoId = "1469967630365622403"; 
 const canalTranscriptsId = "1473454832567320768"; 
 const canalLogsId = "1470928427199631412"; 
+const canalWelcomeId = "1469618755037429792"; // 👈 ASEGÚRATE QUE ESTE ID SEA EL DE BIENVENIDAS
+const rolPartnerAutoId = "1470862847671140412"; 
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
     SOPORTE: "1469621686155346042", 
@@ -56,8 +58,27 @@ function updateRanking(userId, userTag) {
 
 const enviarLog = (embed) => {
     const canal = client.channels.cache.get(canalLogsId);
-    if (canal) canal.send({ embeds: [embed] }).catch(() => {});
+    if (canal) canal.send({ embeds: [embed] }).catch((e) => console.error("Error enviando log:", e));
 };
+
+// ==========================================
+// 👋 EVENTO: WELCOME (BIENVENIDAS)
+// ==========================================
+client.on('guildMemberAdd', async (member) => {
+    const canal = member.guild.channels.cache.get(canalWelcomeId);
+    if (!canal) return;
+
+    const embedWelcome = new MessageEmbed()
+        .setTitle("👋 ¡Bienvenido a 710 Bot Shop!")
+        .setDescription(`Hola ${member}, gracias por unirte a **${member.guild.name}**.\n\n> No olvides leer las normas y abrir un ticket si deseas comprar algo.`)
+        .setColor("#2f3136")
+        .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+        .setImage("https://i.imgur.com/Tu7vI7h.png") // Puedes cambiar esta URL por un banner
+        .setFooter({ text: `Eres el miembro número ${member.guild.memberCount}` })
+        .setTimestamp();
+
+    canal.send({ content: `Bienvenido/a ${member}! 🚀`, embeds: [embedWelcome] });
+});
 
 // ==========================================
 // 🕹️ EVENTO: INTERACTION CREATE
@@ -69,7 +90,36 @@ client.on('interactionCreate', async (interaction) => {
             const command = client.slashCommands.get(interaction.commandName);
             if (command) return await command.run(client, interaction);
 
-            // --- COMANDOS DE RANGOS (RESELLER / CUSTOMER / ULTRA) ---
+            // COMANDO RENVEMBED (PARA ENVIAR LOS PANELES)
+            if (interaction.commandName === "renvembed") {
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+
+                const embedPanel = new MessageEmbed()
+                    .setTitle("📩 CENTRO DE ATENCIÓN Y PARTNERS")
+                    .setDescription("Selecciona una categoría para abrir un ticket o verificar tu partner.\n\n🛒 **Compras:** Para adquirir productos.\n🛠 **Soporte:** Dudas generales.\n🤝 **Partner:** Si cumples los requisitos.\n✅ **Verificar Partner:** Si ya tienes el canal del AD puesto.")
+                    .setColor("#2f3136")
+                    .setFooter({ text: "710 Bot Shop" });
+
+                const row = new MessageActionRow().addComponents(
+                    new MessageButton().setCustomId("ticket_compra").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
+                    new MessageButton().setCustomId("ticket_soporte").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
+                    new MessageButton().setCustomId("ticket_partner").setLabel("Solicitar Partner").setStyle("SUCCESS").setEmoji("🤝"),
+                    new MessageButton().setCustomId("verificar_partner").setLabel("Auto-Partner").setStyle("DANGER").setEmoji("✅")
+                );
+
+                await interaction.channel.send({ embeds: [embedPanel], components: [row] });
+                return interaction.reply({ content: "✅ Panel enviado correctamente.", ephemeral: true });
+            }
+
+            // COMANDO EMBED (SIMPLE)
+            if (interaction.commandName === "embed") {
+                const embedSimple = new MessageEmbed()
+                    .setTitle("710 Bot Shop")
+                    .setDescription("Comando de embed funcionando correctamente.")
+                    .setColor("#2f3136");
+                return interaction.reply({ embeds: [embedSimple] });
+            }
+
             if (["reseller", "customer", "ultra"].includes(interaction.commandName)) {
                 if (!interaction.member.roles.cache.has(rolPermitidoId)) {
                     return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
@@ -82,17 +132,17 @@ client.on('interactionCreate', async (interaction) => {
                 let mensajeExtra = "";
 
                 if (interaction.commandName === "reseller") {
-                    rolId = "1471010330229477528"; // ID Reseller
+                    rolId = "1473471902810112062";
                     prefijo = "Reseller";
                     titulo = "¡Bienvenido al equipo de Reseller!";
                     mensajeExtra = "**En todos nuestros productos cuentas con un gran descuento para poder hacer las mejores ventas en tu shop.**";
                 } else if (interaction.commandName === "customer") {
-                    rolId = "ID_AQUÍ_CUSTOMER"; // 👈 PON EL ID DEL ROL CUSTOMER
+                    rolId = "1470894748041482416"; 
                     prefijo = "Customer";
                     titulo = "¡Gracias por tu compra! (Customer)";
                     mensajeExtra = "Gracias por confiar en **710 Bot Shop**. Ahora tienes acceso a beneficios exclusivos para clientes.";
                 } else if (interaction.commandName === "ultra") {
-                    rolId = "ID_AQUÍ_ULTRA"; // 👈 PON EL ID DEL ROL ULTRA CUSTOMER
+                    rolId = "1470865175866507394"; 
                     prefijo = "Ultra Customer";
                     titulo = "¡Eres un miembro VIP (Ultra Customer)!";
                     mensajeExtra = "Has alcanzado el rango **Ultra**. Disfruta de la máxima prioridad y los mejores descuentos de la tienda.";
@@ -129,17 +179,27 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             const { customId, member, user, guild } = interaction;
             
-            // Botón Partner
             if (customId === "verificar_partner") {
-                const rolPartnerId = "147101000000000000"; 
                 try {
-                    if (member.roles.cache.has(rolPartnerId)) return interaction.reply({ content: "✅ Ya eres Partner.", ephemeral: true });
-                    await member.roles.add(rolPartnerId);
-                    return interaction.reply({ content: "🎉 ¡Rol de Partner asignado!", ephemeral: true });
-                } catch (e) { return interaction.reply({ content: "❌ Error de permisos.", ephemeral: true }); }
+                    if (member.roles.cache.has(rolPartnerAutoId)) {
+                        return interaction.reply({ content: "✅ Ya tienes el rol de Partner.", ephemeral: true });
+                    }
+                    await member.roles.add(rolPartnerAutoId);
+                    
+                    const embedLogPartner = new MessageEmbed()
+                        .setTitle("🤝 Nuevo Partner Auto-Asignado")
+                        .setColor("BLUE")
+                        .setDescription(`El usuario ${user} se ha verificado como Partner.`)
+                        .setTimestamp();
+                    enviarLog(embedLogPartner);
+
+                    return interaction.reply({ content: "🎉 ¡Se te ha asignado el rol de Partner correctamente!", ephemeral: true });
+                } catch (e) {
+                    console.error(e);
+                    return interaction.reply({ content: "❌ No pude asignarte el rol. Revisa que mi rol esté por encima del de Partner.", ephemeral: true });
+                }
             }
 
-            // Botones de Ticket
             if (customId === "asumir") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
                 updateRanking(user.id, user.tag);
@@ -188,6 +248,17 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.deferReply();
                 const transcript = await transcripts.createTranscript(channel);
                 await client.channels.cache.get(canalTranscriptsId).send({ content: `Transcript: ${channel.name}`, files: [transcript] });
+                
+                const embedCierreLog = new MessageEmbed()
+                    .setTitle("🔒 Ticket Cerrado")
+                    .setColor("RED")
+                    .addFields(
+                        { name: "Canal", value: `${channel.name}`, inline: true },
+                        { name: "Cerrado por", value: `${user.tag}`, inline: true }
+                    )
+                    .setTimestamp();
+                enviarLog(embedCierreLog);
+
                 await interaction.editReply("🔒 Cerrando...");
                 return setTimeout(() => channel.delete().catch(() => {}), 3000);
             }
@@ -196,18 +267,44 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.deferReply({ ephemeral: true });
                 const tipo = customId.split('_')[1];
                 let nombreCanal = "";
-                let detalleAyuda = "";
+                const ticketID = Math.floor(Math.random() * 9000000000) + 1000000000;
+
+                const embedT = new MessageEmbed()
+                    .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
+                    .setTitle("SISTEMA DE TICKETS")
+                    .setColor("#2f3136")
+                    .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+                    .setDescription(`¡Bienvenido/a ${user}! El Staff te atenderá pronto.\nPor favor, danos los detalles necesarios.`)
+                    .addFields(
+                        { name: "Categoría", value: `\`${tipo.toUpperCase()}\``, inline: true },
+                        { name: "ID del Ticket", value: `\`${ticketID}\``, inline: true },
+                        { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
+                        { name: "Usuario", value: `${user} (${user.id})` }
+                    );
 
                 if (tipo === "compra") {
                     nombreCanal = `🛒buy-${user.username}`;
-                    detalleAyuda = `**Producto:** ${fields.getTextInputValue('p_producto')}\n**Método:** ${fields.getTextInputValue('p_metodo')}`;
+                    const producto = fields.getTextInputValue('p_producto');
+                    const metodo = fields.getTextInputValue('p_metodo');
+                    embedT.addFields(
+                        { name: "📦 Producto", value: `\`${producto}\``, inline: true },
+                        { name: "💳 Método", value: `\`${metodo}\``, inline: true }
+                    );
                 } else if (tipo === "soporte") {
                     nombreCanal = `🛠soporte-${user.username}`;
-                    detalleAyuda = fields.getTextInputValue('p_duda');
+                    const duda = fields.getTextInputValue('p_duda');
+                    embedT.addFields({ name: "❓ Ayuda", value: `\`\`\`${duda}\`\`\`` });
                 } else if (tipo === "partner") {
                     nombreCanal = `🤝partner-${user.username}`;
-                    detalleAyuda = `**Link:** ${fields.getTextInputValue('p_link')}\n**Ad puesto:** ${fields.getTextInputValue('p_add')}`;
+                    const link = fields.getTextInputValue('p_link');
+                    const add = fields.getTextInputValue('p_add');
+                    embedT.addFields(
+                        { name: "🔗 Link", value: `\`${link}\``, inline: true },
+                        { name: "📢 Ad Puesto", value: `\`${add}\``, inline: true }
+                    );
                 }
+
+                embedT.setFooter({ text: `710 Shop - Gestión de Tickets • ${moment().format('DD/MM/YYYY HH:mm')}` });
 
                 const nChannel = await guild.channels.create(nombreCanal, {
                     parent: CATEGORIAS[tipo.toUpperCase()],
@@ -218,19 +315,6 @@ client.on('interactionCreate', async (interaction) => {
                     ]
                 });
 
-                const embedT = new MessageEmbed()
-                    .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
-                    .setTitle("SISTEMA DE TICKETS")
-                    .setColor("#2f3136")
-                    .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                    .addFields(
-                        { name: "Categoría", value: `\`${tipo.toUpperCase()}\``, inline: true },
-                        { name: "Usuario", value: `\`${user.tag}\``, inline: true },
-                        { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY')}\``, inline: true },
-                        { name: "❓ Detalles", value: `\`\`\`${detalleAyuda}\`\`\`` }
-                    )
-                    .setFooter({ text: "710 Shop - Gestión de Tickets" });
-
                 const row = new MessageActionRow().addComponents(
                     new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
                     new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
@@ -238,6 +322,18 @@ client.on('interactionCreate', async (interaction) => {
                 );
 
                 await nChannel.send({ content: `<@${user.id}> | <@&${rolPermitidoId}>`, embeds: [embedT], components: [row] });
+                
+                const embedLogApertura = new MessageEmbed()
+                    .setTitle("📂 Nuevo Ticket Abierto")
+                    .setColor("GREEN")
+                    .setDescription(`Se ha creado un nuevo ticket en ${nChannel}`)
+                    .addFields(
+                        { name: "Usuario", value: `${user.tag}`, inline: true },
+                        { name: "ID Ticket", value: `${ticketID}`, inline: true }
+                    )
+                    .setTimestamp();
+                enviarLog(embedLogApertura);
+
                 return await interaction.editReply(`✅ Ticket abierto: ${nChannel}`);
             }
         }
@@ -246,7 +342,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// --- LÓGICA DE LOGS Y EVENTOS ---
+// --- LOGS DE MENSAJES ---
 client.on('messageCreate', m => {
     if (!m.guild || m.author.bot || m.channel.id === canalLogsId) return;
     enviarLog(new MessageEmbed().setAuthor({ name: `Mensaje: ${m.author.tag}`, iconURL: m.author.displayAvatarURL() }).setColor("#2f3136").setDescription(`**Canal:** ${m.channel}\n**Contenido:**\n${m.content || "*[Archivo/Embed]*"}`).setTimestamp());
@@ -275,17 +371,21 @@ client.on('ready', async () => {
     } catch (error) {}
 
     try {
+        // --- 📋 REGISTRO DE COMANDOS ---
         const comandosManuales = [
             { name: 'reseller', description: 'Rango Reseller', options: [{ name: 'usuario', type: 'USER', description: 'Usuario', required: true }] },
             { name: 'customer', description: 'Rango Customer', options: [{ name: 'usuario', type: 'USER', description: 'Usuario', required: true }] },
             { name: 'ultra', description: 'Rango Ultra Customer', options: [{ name: 'usuario', type: 'USER', description: 'Usuario', required: true }] },
             { name: 'mp', description: 'Métodos de pago' },
-            { name: 'renvembed', description: 'Reenviar mensaje' },
-            { name: 'clearpanel', description: 'Limpiar mensajes' }
+            { name: 'renvembed', description: 'Re-enviar el panel de tickets y partner' }, // 👈 AGREGADO
+            { name: 'embed', description: 'Prueba de embed' } // 👈 AGREGADO
         ];
 
         const guild = client.guilds.cache.get(ID_SERVIDOR);
-        if (guild) await guild.commands.set(comandosManuales);
+        if (guild) {
+            await guild.commands.set(comandosManuales);
+            console.log("🚀 Comandos registrados con éxito.");
+        }
     } catch (error) {
         console.error("Error comandos:", error);
     }
