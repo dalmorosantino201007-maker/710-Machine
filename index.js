@@ -71,10 +71,12 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 👋 EVENTOS DE MIEMBROS
+// 👋 EVENTOS DE MIEMBROS (CORREGIDO)
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
+    // Aseguramos obtener el canal de la caché o fetch para evitar errores de carga
     const canal = member.guild.channels.cache.get(canalWelcomeId) || await member.guild.channels.fetch(canalWelcomeId).catch(() => null);
+    
     if (canal) {
         const embedWelcome = new MessageEmbed()
             .setTitle("👋 ¡Bienvenido a 710 Bot Shop!")
@@ -84,7 +86,9 @@ client.on('guildMemberAdd', async (member) => {
             .setImage("https://i.imgur.com/Tu7vI7h.png")
             .setFooter({ text: `Eres el miembro número ${member.guild.memberCount}` })
             .setTimestamp();
-        canal.send({ content: `Bienvenido/a ${member}! 🚀`, embeds: [embedWelcome] }).catch(console.error);
+        
+        // Enviamos el mensaje con el ping al usuario
+        canal.send({ content: `¡Bienvenido/a ${member}! 🚀`, embeds: [embedWelcome] }).catch(console.error);
     }
 });
 
@@ -93,7 +97,6 @@ client.on('guildMemberAdd', async (member) => {
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- SLASH COMMANDS ---
         if (interaction.isCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             if (command) return await command.run(client, interaction);
@@ -116,25 +119,28 @@ client.on('interactionCreate', async (interaction) => {
                 await interaction.channel.send({ embeds: [embedPanel], components: [row] });
                 return interaction.reply({ content: "✅ Panel enviado correctamente.", ephemeral: true });
             }
-
-            if (["reseller", "customer", "ultra"].includes(interaction.commandName)) {
-                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-                const targetUser = interaction.options.getMember('usuario');
-                let rolId = interaction.commandName === "reseller" ? "1473471902810112062" : (interaction.commandName === "customer" ? "1470894748041482416" : "1470865175866507394");
-                let prefijo = interaction.commandName.charAt(0).toUpperCase() + interaction.commandName.slice(1);
-                
-                try {
-                    await targetUser.roles.add(rolId);
-                    await targetUser.setNickname(`${prefijo} | ${targetUser.user.username}`).catch(() => {});
-                    return interaction.reply({ embeds: [new MessageEmbed().setTitle(`🎉 Rango ${prefijo} Asignado`).setColor("GREEN").setDescription(`¡Hola ${targetUser}! Ya tienes tu rango.`).setTimestamp()] });
-                } catch (e) { return interaction.reply({ content: "❌ Error de jerarquía.", ephemeral: true }); }
-            }
         }
 
         // --- BOTONES ---
         if (interaction.isButton()) {
             const { customId, member, user, guild } = interaction;
             
+            // BOTÓN NOTIFICAR (NUEVO)
+            if (customId === "notificar_usuario") {
+                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede usar esto.", ephemeral: true });
+                
+                // Buscamos al usuario que abrió el ticket (asumimos que es el mencionado en el primer mensaje)
+                const firstMsg = await interaction.channel.messages.fetch({ limit: 10, after: 0 }).then(msgs => msgs.last());
+                const target = firstMsg?.mentions.users.first();
+                
+                if (target) {
+                    await interaction.channel.send({ content: `🔔 ${target}, el Staff solicita tu atención en este ticket.` });
+                    return interaction.reply({ content: "✅ Usuario notificado.", ephemeral: true });
+                } else {
+                    return interaction.reply({ content: "❌ No pude encontrar al usuario para taguearlo.", ephemeral: true });
+                }
+            }
+
             if (customId === "verificar_partner") {
                 await interaction.deferReply({ ephemeral: true }); 
                 if (member.roles.cache.has(rolPartnerAutoId)) return interaction.editReply({ content: "✅ Ya tienes el rango de Partner." });
@@ -143,8 +149,7 @@ client.on('interactionCreate', async (interaction) => {
                     await member.roles.add(rolPartnerAutoId);
                     return interaction.editReply({ content: "🎉 ¡Verificado! Ahora tienes acceso a la sección de partners." });
                 } catch (e) {
-                    console.error(e);
-                    return interaction.editReply({ content: "❌ No pude darte el rol. Revisa que mi rol esté arriba del de Partner en Ajustes del Servidor." });
+                    return interaction.editReply({ content: "❌ No pude darte el rol. Revisa mi jerarquía." });
                 }
             }
 
@@ -170,9 +175,7 @@ client.on('interactionCreate', async (interaction) => {
                         new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Qué método de pago usarás?").setStyle('SHORT').setRequired(true))
                     );
                 } else {
-                    modal.addComponents(
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_detalle').setLabel("Escribe tu duda o motivo").setStyle('PARAGRAPH').setRequired(true))
-                    );
+                    modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_detalle').setLabel("Escribe tu duda o motivo").setStyle('PARAGRAPH').setRequired(true)));
                 }
                 return await interaction.showModal(modal);
             }
@@ -187,7 +190,14 @@ client.on('interactionCreate', async (interaction) => {
                 const tipo = customId.split('_')[1];
                 const nombreLimpio = user.username.replace(/[^a-zA-Z0-9]/g, "") || user.id;
 
-                const nChannel = await guild.channels.create(`${tipo}-${nombreLimpio}`, {
+                // --- LÓGICA DE NOMBRES DE CANAL (MODIFICADO) ---
+                let emojiPrefix = "";
+                if (tipo === "compra") emojiPrefix = "🛒buy-";
+                else if (tipo === "soporte") emojiPrefix = "🛠support-";
+                else if (tipo === "partner") emojiPrefix = "🤝partner-";
+                else emojiPrefix = `${tipo}-`;
+
+                const nChannel = await guild.channels.create(`${emojiPrefix}${nombreLimpio}`, {
                     parent: CATEGORIAS[tipo.toUpperCase()],
                     permissionOverwrites: [
                         { id: guild.id, deny: ['VIEW_CHANNEL'] },
@@ -214,16 +224,16 @@ client.on('interactionCreate', async (interaction) => {
                         { name: "💳 Método de Pago", value: `\`${fields.getTextInputValue('p_metodo')}\``, inline: true }
                     );
                 } else {
-                    embedTicket.addFields(
-                        { name: "📝 Detalles / Motivo", value: `\`\`\`${fields.getTextInputValue('p_detalle')}\`\`\``, inline: false }
-                    );
+                    embedTicket.addFields({ name: "📝 Detalles / Motivo", value: `\`\`\`${fields.getTextInputValue('p_detalle')}\`\`\``, inline: false });
                 }
 
                 embedTicket.setFooter({ text: "710 Shop - Gestión de Tickets" }).setTimestamp();
 
+                // --- BOTONES CON NOTIFICAR ---
                 const row = new MessageActionRow().addComponents(
                     new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅")
+                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                    new MessageButton().setCustomId("notificar_usuario").setLabel("Notificar").setStyle("PRIMARY").setEmoji("🔔")
                 );
 
                 await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
