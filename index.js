@@ -10,36 +10,43 @@ const {
     TextInputComponent 
 } = require('discord.js');
 
+const Discord = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
-const transcripts = require('discord-html-transcripts'); 
+const transcript = require('discord-html-transcripts'); 
 const config = require('./DataBaseJson/config.json');
-const { authenticator } = require('otplib'); // 🔐 NUEVO: Librería para el 2FA
+const { authenticator } = require('otplib');
+const sqlite3 = require('sqlite3').verbose();
 
 moment.locale('es');
 
+// --- 🗄️ BASE DE DATOS ---
+const db = new sqlite3.Database('./DataBaseJson/tickets.db');
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS tickets (id INTEGER PRIMARY KEY AUTOINCREMENT, creatorId TEXT)`);
+    db.run(`CREATE TABLE IF NOT EXISTS conteo_tickets (total INTEGER)`);
+    db.get(`SELECT total FROM conteo_tickets`, (err, row) => {
+        if (!row) db.run(`INSERT INTO conteo_tickets (total) VALUES (0)`);
+    });
+});
+
+const estadoTickets = {}; 
+
 const client = new Client({
     intents: [
-        "GUILDS", 
-        "GUILD_MEMBERS", 
-        "GUILD_MESSAGES", 
-        "GUILD_MESSAGE_REACTIONS", 
-        "GUILD_VOICE_STATES", 
-        "GUILD_PRESENCES", 
-        "GUILD_BANS", 
-        "DIRECT_MESSAGES"
+        "GUILDS", "GUILD_MEMBERS", "GUILD_MESSAGES", "GUILD_MESSAGE_REACTIONS", 
+        "GUILD_VOICE_STATES", "GUILD_PRESENCES", "GUILD_BANS", "DIRECT_MESSAGES"
     ],
     partials: ["MESSAGE", "CHANNEL", "REACTION", "USER", "GUILD_MEMBER"],
 });
 
-// --- 📂 MANEJO DE COMANDOS (HANDLER) ---
+// --- 📂 HANDLER ---
 client.slashCommands = new Collection();
 try {
     require('./handler')(client);
-    console.log("✅ Handler cargado correctamente.");
 } catch (error) {
-    console.error("❌ Error cargando el Handler:", error);
+    console.error("❌ Error en Handler:", error);
 }
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
@@ -48,32 +55,21 @@ const canalVozId = "1475258262692827354";
 const canalTranscriptsId = "1473454832567320768"; 
 const canalLogsId = "1470928427199631412"; 
 const canalWelcomeId = "1469953972197654570"; 
-const rolPartnerAutoId = "1470862847671140412"; 
 const ID_SERVIDOR = '1469618754282586154';
+
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
     SOPORTE: "1469621686155346042", 
     PARTNER: "1471010330229477528"  
 };
 
-// --- 💾 FUNCIONES DE BASE DE DATOS ---
-const rankingPath = './DataBaseJson/ranking.json';
-
-function updateRanking(userId, userTag) {
-    if (!fs.existsSync(rankingPath)) fs.writeFileSync(rankingPath, JSON.stringify({}));
-    let ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
-    if (!ranking[userId]) ranking[userId] = { tag: userTag, tickets: 0 };
-    ranking[userId].tickets += 1;
-    fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
-}
-
 const enviarLog = (embed) => {
     const canal = client.channels.cache.get(canalLogsId);
-    if (canal) canal.send({ embeds: [embed] }).catch((e) => console.error("Error enviando log:", e));
+    if (canal) canal.send({ embeds: [embed] }).catch(() => {});
 };
 
 // ==========================================
-// 👋 EVENTO: BIENVENIDAS ESTILO PROFESIONAL
+// 👋 EVENTO: BIENVENIDAS (ESTILO SOLICITADO)
 // ==========================================
 client.on('guildMemberAdd', async (member) => {
     const canal = member.guild.channels.cache.get(canalWelcomeId) || await member.guild.channels.fetch(canalWelcomeId).catch(() => null);
@@ -106,266 +102,223 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE
+// 🕹️ EVENTO: INTERACTION CREATE (TICKETS + 2FA)
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- 1. GESTIÓN DE SLASH COMMANDS ---
+        const ticketId = interaction.channel?.id;
+
         if (interaction.isCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
-            
-            if (command) {
-                await command.run(client, interaction);
-                return; 
-            }
+            if (command) return await command.run(client, interaction);
 
             if (interaction.commandName === "renvembed") {
                 if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-                
                 const embedPanel = new MessageEmbed()
-                    .setTitle("📩 CENTRO DE ATENCIÓN Y PARTNERS")
-                    .setDescription("Selecciona una categoría para abrir un ticket o verificar tu partner.\n\n🛒 **Compras:** Para adquirir productos.\n🛠 **Soporte:** Dudas generales.\n🤝 **Partner:** Si cumples los requisitos.\n✅ **Verificar Partner:** Si ya tienes el canal del AD puesto.")
+                    .setTitle("📩 CENTRO DE ATENCIÓN")
+                    .setDescription("Selecciona una opción para abrir un ticket.")
                     .setColor("#2f3136");
-                
                 const row = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("ticket_compra").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
-                    new MessageButton().setCustomId("ticket_soporte").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
-                    new MessageButton().setCustomId("ticket_partner").setLabel("Solicitar Partner").setStyle("SUCCESS").setEmoji("🤝"),
-                    new MessageButton().setCustomId("verificar_partner").setLabel("Auto-Partner").setStyle("DANGER").setEmoji("✅")
+                    new MessageButton().setCustomId("opc1").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
+                    new MessageButton().setCustomId("opc2").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
+                    new MessageButton().setCustomId("opc3").setLabel("Partner").setStyle("SUCCESS").setEmoji("🤝")
                 );
-                
                 await interaction.channel.send({ embeds: [embedPanel], components: [row] });
-                await interaction.reply({ content: "✅ Panel enviado correctamente.", ephemeral: true });
-                return; 
-            }
-
-            // --- COMANDO PARA EL PANEL 2FA ---
-            if (interaction.commandName === "2facode") {
-                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-
-                const embed2FA = new MessageEmbed()
-                    .setTitle("🔐 GENERADOR DE CÓDIGOS 2FA")
-                    .setDescription("Obtén tu código de verificación al instante.\n\nPresiona el botón e introduce tu **Secret Key** para generar el código de 6 dígitos.")
-                    .setColor("#f08221")
-                    .setFooter({ text: "Sistema de Seguridad 710 Shop" });
-
-                const row2FA = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("btn_2fa_generar").setLabel("Generar Código").setStyle("SUCCESS").setEmoji("🔑")
-                );
-
-                await interaction.channel.send({ embeds: [embed2FA], components: [row2FA] });
-                return interaction.reply({ content: "✅ Panel 2FA enviado.", ephemeral: true });
-            }
-            return; 
-        }
-
-        // --- 2. GESTIÓN DE BOTONES ---
-        if (interaction.isButton()) {
-            const { customId, member, user, guild } = interaction;
-            
-            // Botón del 2FA
-            if (customId === "btn_2fa_generar") {
-                const modal2FA = new Modal().setCustomId('modal_auth_2fa').setTitle('Generar Código 2FA');
-                const inputSecret = new TextInputComponent()
-                    .setCustomId('secret_input')
-                    .setLabel("Introduce tu Secret Key (Base32)")
-                    .setStyle('SHORT')
-                    .setPlaceholder('Ejemplo: JBSWY3DPEHPK3PXP')
-                    .setRequired(true);
-
-                modal2FA.addComponents(new MessageActionRow().addComponents(inputSecret));
-                return await interaction.showModal(modal2FA);
-            }
-
-            if (customId === "notificar_usuario") {
-                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede usar esto.", ephemeral: true });
-                await interaction.channel.send({ content: `🔔 **Atención:** El Staff solicita tu presencia en este ticket, <@${interaction.channel.topic}>.` });
-                return interaction.reply({ content: "✅ Usuario notificado.", ephemeral: true });
-            }
-
-            if (customId === "verificar_partner") {
-                await interaction.deferReply({ ephemeral: true }); 
-                if (member.roles.cache.has(rolPartnerAutoId)) return interaction.editReply({ content: "✅ Ya tienes el rango de Partner." });
-                try {
-                    await member.roles.add(rolPartnerAutoId);
-                    return interaction.editReply({ content: "🎉 ¡Verificado! Ahora tienes acceso a la sección de partners." });
-                } catch (e) {
-                    return interaction.editReply({ content: "❌ No pude darte el rol. Revisa mi jerarquía." });
-                }
-            }
-
-            if (customId === "asumir") {
-                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
-                updateRanking(user.id, user.tag);
-                return await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
-            }
-
-            if (customId === "fechar_ticket") {
-                const modalCierre = new Modal().setCustomId('modal_nota_cierre').setTitle('Cerrar Ticket');
-                modalCierre.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('nota_staff').setLabel("Nota final").setStyle('PARAGRAPH')));
-                return await interaction.showModal(modalCierre);
-            }
-
-            if (customId.startsWith("ticket_")) {
-                const tipo = customId.split('_')[1];
-                const modal = new Modal().setCustomId(`modal_${tipo}`).setTitle(`Formulario de ${tipo.toUpperCase()}`);
-                if (tipo === "compra") {
-                    modal.addComponents(
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_producto').setLabel("¿Qué producto deseas?").setStyle('SHORT').setRequired(true)),
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Qué método de pago usarás?").setStyle('SHORT').setRequired(true))
-                    );
-                } else {
-                    modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_detalle').setLabel("Escribe tu duda o motivo").setStyle('PARAGRAPH').setRequired(true)));
-                }
-                return await interaction.showModal(modal);
+                return interaction.reply({ content: "✅ Panel enviado.", ephemeral: true });
             }
         }
 
-        // --- 3. GESTIÓN DE MODALES ---
         if (interaction.isModalSubmit()) {
-            const { customId, user, guild, channel, fields } = interaction;
-            
-            // Lógica para procesar la Secret Key y dar el código
-            if (customId === 'modal_auth_2fa') {
-                const secret = fields.getTextInputValue('secret_input').replace(/\s+/g, ''); // Limpiar espacios
+            if (interaction.customId === 'modal_auth_2fa') {
+                const secret = interaction.fields.getTextInputValue('secret_input').replace(/\s+/g, '');
                 try {
                     const token = authenticator.generate(secret);
-                    const timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+                    return interaction.reply({ content: `🔑 Código: \`${token}\``, ephemeral: true });
+                } catch (e) { return interaction.reply({ content: "❌ Key inválida.", ephemeral: true }); }
+            }
 
-                    const embedCode = new MessageEmbed()
-                        .setTitle("🔑 CÓDIGO GENERADO")
-                        .setDescription(`Tu código de verificación es:\n# \`${token}\``)
-                        .addField("⏳ Expira en", `\`${timeLeft} segundos\``)
-                        .setColor("GREEN")
-                        .setFooter({ text: "Seguridad 710 Shop" });
+            if (interaction.customId.startsWith("modal_")) {
+                const opc = interaction.customId;
+                let nome, categoria, ticketKey, respuestas = [];
 
-                    return interaction.reply({ embeds: [embedCode], ephemeral: true });
-                } catch (e) {
-                    return interaction.reply({ content: "❌ **Error:** La Secret Key es inválida. Asegúrate de copiarla bien.", ephemeral: true });
+                if (opc === "modal_opc1") {
+                    nome = `🛒・compra-${interaction.user.username}`;
+                    categoria = CATEGORIAS.COMPRA;
+                    ticketKey = "ticket1";
+                    respuestas = [
+                        { name: "🛒 Producto:", value: interaction.fields.getTextInputValue("producto") },
+                        { name: "💳 Método de pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
+                        { name: "📄 Cantidad:", value: interaction.fields.getTextInputValue("cantidad_compra") }
+                    ];
+                } else if (opc === "modal_opc2") {
+                    nome = `🛠・soporte-${interaction.user.username}`;
+                    categoria = CATEGORIAS.SOPORTE;
+                    ticketKey = "ticket2";
+                    respuestas = [
+                        { name: "🔨 Producto:", value: interaction.fields.getTextInputValue("producto") },
+                        { name: "⚠️ Problema:", value: interaction.fields.getTextInputValue("problema") },
+                        { name: "📄 Info adicional:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
+                    ];
+                } else if (opc === "modal_opc3") {
+                    nome = `🤝・partner-${interaction.user.username}`;
+                    categoria = CATEGORIAS.PARTNER;
+                    ticketKey = "ticket3";
+                    respuestas = [
+                        { name: "🌐 Servidor:", value: interaction.fields.getTextInputValue("servidor") },
+                        { name: "👥 ¿+250 Miembros?:", value: interaction.fields.getTextInputValue("miembros") },
+                        { name: "🎯 Ya envio nuestro ad:", value: interaction.fields.getTextInputValue("nuestroad") }
+                    ];
                 }
-            }
 
-            // --- NUEVA LÓGICA PARA EMBEDS (SOLO ESTO SE AÑADIÓ) ---
-            if (customId === 'modal_embed_custom') {
-                const titulo = fields.getTextInputValue('titulo_embed');
-                const descripcion = fields.getTextInputValue('desc_embed');
-                const color = fields.getTextInputValue('color_embed') || "#2f3136";
+                const existing = interaction.guild.channels.cache.find(c => estadoTickets[c.id]?.creadorId === interaction.user.id);
+                if (existing) return interaction.reply({ content: `⚠️ Ya tienes un ticket: ${existing}`, ephemeral: true });
 
-                const embedGenerado = new MessageEmbed()
-                    .setTitle(titulo)
-                    .setDescription(descripcion)
-                    .setColor(color)
-                    .setTimestamp();
-
-                await channel.send({ embeds: [embedGenerado] });
-                return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
-            }
-
-            // Lógica para tickets (Se añadió la excepción de modal_embed_custom para que no cree canal)
-            // Lógica para tickets (Corregida la sintaxis del emojiPrefix)
-            if (customId.startsWith('modal_') && customId !== 'modal_nota_cierre' && customId !== 'modal_embed_custom') {
-                await interaction.deferReply({ ephemeral: true });
-                const tipo = customId.split('_')[1];
-                const nombreLimpio = user.username.replace(/[^a-zA-Z0-9]/g, "") || user.id;
-                const idTicketAleatorio = Math.floor(1000000000 + Math.random() * 9000000000);
-
-                // --- LINEA CORREGIDA AQUÍ ---
-                let emojiPrefix = (tipo === "compra") ? "🛒buy-" : (tipo === "soporte") ? "🛠support-" : (tipo === "partner") ? "🤝partner-" : `${tipo}-`;
-
-                const nChannel = await guild.channels.create(`${emojiPrefix}${nombreLimpio}`, {
-                    parent: CATEGORIAS[tipo.toUpperCase()],
-                    topic: user.id, 
+                const ch = await interaction.guild.channels.create(nome, {
+                    parent: categoria,
                     permissionOverwrites: [
-                        { id: guild.id, deny: ['VIEW_CHANNEL'] },
-                        { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
+                        { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
+                        { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES', 'EMBED_LINKS'] },
                         { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
                     ]
                 });
 
-                const embedTicket = new MessageEmbed()
-                    .setAuthor({ name: "710 Bot Shop", iconURL: guild.iconURL({ dynamic: true }) })
-                    .setTitle("SISTEMA DE TICKETS")
-                    .setDescription(`¡Bienvenido/a ${user}! El Staff te atenderá pronto.\nPor favor, danos los detalles necesarios.`)
-                    .setColor("#2f3136")
-                    .setThumbnail("https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/Discord_logo_orange.svg/1200px-Discord_logo_orange.svg.png")
-                    .addFields(
-                        { name: "Categoría", value: `\`${tipo.charAt(0).toUpperCase() + tipo.slice(1)}\``, inline: true },
-                        { name: "ID del Ticket", value: `\`${idTicketAleatorio}\``, inline: true },
-                        { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
-                        { name: "Usuario", value: `${user.tag} (${user.id})`, inline: false }
+                db.run(`INSERT INTO tickets (creatorId) VALUES (?)`, [interaction.user.id], function(err) {
+                    const ticketDbId = this.lastID;
+                    estadoTickets[ch.id] = { creadorId: interaction.user.id, reclamado: false, fechaCreacion: new Date(), ticketId: ticketDbId };
+                    
+                    const embedTicket = new MessageEmbed()
+                        .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
+                        .addFields(
+                            { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
+                            { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
+                            { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
+                        ).setTimestamp();
+
+                    const controlButtons = new MessageActionRow().addComponents(
+                        new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
+                        new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
+                        new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
                     );
 
-                if (tipo === "compra") {
-                    embedTicket.addFields(
-                        { name: "📦 Producto", value: `\`\`\`${fields.getTextInputValue('p_producto')}\`\`\``, inline: true },
-                        { name: "💳 Método", value: `\`\`\`${fields.getTextInputValue('p_metodo')}\`\`\``, inline: true }
-                    );
-                } else {
-                    embedTicket.addFields({ name: "📝 Detalles", value: `\`\`\`${fields.getTextInputValue('p_detalle')}\`\`\``, inline: false });
-                }
-
-                embedTicket.setFooter({ text: `710 Shop - Gestión de Tickets • ${moment().format('LTS')}` });
-
-                const row = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
-                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-                    new MessageButton().setCustomId("notificar_usuario").setLabel("Notificar").setStyle("PRIMARY").setEmoji("🔔")
-                );
-
-                await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
-                return interaction.editReply(`✅ Canal creado: ${nChannel}`);
+                    ch.send({ content: `<@${interaction.user.id}>`, embeds: [embedTicket], components: [controlButtons] });
+                    ch.send({ embeds: [new MessageEmbed().setTitle("📋 Respuestas").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
+                    interaction.reply({ content: `✅ Ticket creado: ${ch}`, ephemeral: true });
+                });
             }
         }
-    } catch (err) { console.error("Interaction Error:", err); }
+
+        if (interaction.isButton()) {
+            const opc = interaction.customId;
+            const ticket = estadoTickets[ticketId];
+
+            if (opc === "opc1") {
+                const m1 = new Modal().setCustomId("modal_opc1").setTitle("Compras");
+                m1.addComponents(
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("metodo_pago").setLabel("Método de pago").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("cantidad_compra").setLabel("Cantidad").setStyle("SHORT"))
+                );
+                return await interaction.showModal(m1);
+            }
+            if (opc === "opc2") {
+                const m2 = new Modal().setCustomId("modal_opc2").setTitle("Soporte");
+                m2.addComponents(
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("problema").setLabel("Problema").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("informacion_extra").setLabel("Info adicional").setStyle("PARAGRAPH").setRequired(false))
+                );
+                return await interaction.showModal(m2);
+            }
+            if (opc === "opc3") {
+                const m3 = new Modal().setCustomId("modal_opc3").setTitle("Partner");
+                m3.addComponents(
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("servidor").setLabel("Link").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("miembros").setLabel("¿+250 Miembros?").setStyle("SHORT")),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("nuestroad").setLabel("¿Enviaste el Ad?").setStyle("SHORT"))
+                );
+                return await interaction.showModal(m3);
+            }
+
+            if (!ticket) return;
+
+            if (opc === "claim_ticket") {
+                ticket.reclamado = true; ticket.reclamadorId = interaction.user.id;
+                return interaction.reply({ content: `✅ Ticket reclamado por ${interaction.user}` });
+            }
+            if (opc === "notify_ticket") {
+                const creador = await interaction.guild.members.fetch(ticket.creadorId).catch(() => null);
+                if (creador) creador.send(`🔔 Te esperan en tu ticket: ${interaction.channel}`).catch(() => {});
+                return interaction.reply({ content: "✅ Notificado", ephemeral: true });
+            }
+            if (opc === "fechar_ticket") {
+                await interaction.deferUpdate();
+                cerrarTicketFinal(interaction, ticket, "Cerrado");
+            }
+        }
+    } catch (err) { console.error(err); }
 });
 
-// ==========================================
-// 📡 AUDITORÍA (LOGS)
-// ==========================================
-client.on('messageDelete', m => { if (!m.guild || m.author?.bot) return; enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("RED").addFields({ name: "Autor", value: `${m.author.tag}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: m.content || "Sin texto" }).setTimestamp()); });
-client.on('messageUpdate', (o, n) => { if (!o.guild || o.author?.bot || o.content === n.content) return; enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("YELLOW").addFields({ name: "Autor", value: `${o.author.tag}` }, { name: "Antes", value: o.content || "Vacío" }, { name: "Después", value: n.content || "Vacío" }).setTimestamp()); });
-client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setDescription(`Nombre: **${c.name}**`).setColor("GREEN").setTimestamp()));
-client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🚫 Canal Eliminado").setDescription(`Nombre: **${c.name}**`).setColor("RED").setTimestamp()));
+// --- FUNCIÓN CIERRE ---
+async function cerrarTicketFinal(interaction, ticket, nota) {
+    const transcriptFile = await transcript.createTranscript(interaction.channel, { limit: -1, returnType: 'attachment' });
+    const embedCierre = new MessageEmbed()
+        .setTitle("📝 Ticket Cerrado").setColor("RED")
+        .addFields(
+            { name: '🎟️ Ticket', value: `\`${interaction.channel.name}\`` },
+            { name: '👤 Abierto por', value: `<@${ticket.creadorId}>` },
+            { name: '🔒 Cerrado por', value: `<@${interaction.user.id}>` }
+        ).setTimestamp();
+
+    const logChan = interaction.guild.channels.cache.get(canalTranscriptsId);
+    if (logChan) logChan.send({ embeds: [embedCierre], files: [transcriptFile] });
+
+    db.run(`DELETE FROM tickets WHERE id = ?`, [ticket.ticketId]);
+    delete estadoTickets[interaction.channel.id];
+    setTimeout(() => interaction.channel.delete().catch(() => {}), 5000);
+}
 
 // ==========================================
-// 🚀 INICIO
+// 📡 AUDITORÍA / LOGS
 // ==========================================
+client.on('messageDelete', async (message) => {
+    if (!message.guild || message.author?.bot) return;
+    const embed = new MessageEmbed()
+        .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto_"}`)
+        .setColor("RED")
+        .setTimestamp();
+    enviarLog(embed);
+});
+
+client.on('messageUpdate', async (oldMessage, newMessage) => {
+    if (!oldMessage.guild || oldMessage.author?.bot || oldMessage.content === newMessage.content) return;
+    const embed = new MessageEmbed()
+        .setAuthor({ name: `Mensaje Editado`, iconURL: oldMessage.author.displayAvatarURL({ dynamic: true }) })
+        .setDescription(`**Autor:** ${oldMessage.author}\n**Canal:** ${oldMessage.channel}\n\n**Antes:**\n${oldMessage.content}\n\n**Después:**\n${newMessage.content}`)
+        .setColor("YELLOW")
+        .setTimestamp();
+    enviarLog(embed);
+});
+
+client.on('guildMemberRemove', async (member) => {
+    const embed = new MessageEmbed()
+        .setAuthor({ name: `Usuario salió`, iconURL: member.user.displayAvatarURL({ dynamic: true }) })
+        .setDescription(`${member.user.tag} ha abandonado el servidor.`)
+        .setColor("ORANGE")
+        .setTimestamp();
+    enviarLog(embed);
+});
+
+// --- READY ---
 client.on('ready', async () => {
-    console.log(`🔥 ${client.user.username} - OPERATIVO`);
-    
+    console.log(`🔥 ${client.user.username} - ONLINE`);
     const guild = client.guilds.cache.get(ID_SERVIDOR);
-    
-    // --- CONEXIÓN AUTOMÁTICA AL CANAL DE VOZ ---
     if (guild) {
         const voiceChannel = guild.channels.cache.get(canalVozId);
-        
-        if (voiceChannel && voiceChannel.type === 'GUILD_VOICE') {
+        if (voiceChannel) {
             const { joinVoiceChannel } = require('@discordjs/voice');
-            
-            try {
-                joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: guild.id,
-                    adapterCreator: guild.voiceAdapterCreator,
-                    selfDeaf: true, // 🎧 ESTO LO ENSORDECE
-                    selfMute: true  // 🎤 TAMBIÉN LO SILENCIA
-                });
-                console.log(`🔊 Conectado y ensordecido en: ${voiceChannel.name}`);
-            } catch (error) {
-                console.error("❌ Error al conectar al canal de voz:", error);
-            }
+            joinVoiceChannel({ channelId: voiceChannel.id, guildId: guild.id, adapterCreator: guild.voiceAdapterCreator, selfDeaf: true, selfMute: true });
         }
-
-        // Registro de comandos (Mantenemos los tuyos)
-        await guild.commands.set([
-            { name: 'reseller', description: 'Asignar rango Reseller', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
-            { name: 'customer', description: 'Asignar rango Customer', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
-            { name: 'ultra', description: 'Asignar rango Ultra', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
-            { name: 'renvembed', description: 'Re-enviar el panel de tickets' },
-            { name: 'embed', description: 'Enviar un mensaje personalizado' },
-            { name: '2facode', description: 'Enviar el panel generador de 2FA' },
-            { name: 'mp', description: 'Ver métodos de pago' }
-        ]);
     }
 });
 
