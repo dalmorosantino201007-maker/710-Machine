@@ -39,7 +39,7 @@ module.exports = {
       .setDescription(
         `**•  __Producto__:** Steam Account\n\n` +
         `**•  Account(s):** ||${account}||\n` +
-        `**•  Login:** [Haz Click Aqui](https://store.steampowered.com/login/)\n\n` +
+        `**•  Mailbox:** [Haz Click Aqui](http://tb.dcmya.cn)\n\n` +
         `Déjanos por favor una reseña para poder seguir creciendo!`
       );
 

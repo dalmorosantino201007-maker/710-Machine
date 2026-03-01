@@ -29,7 +29,7 @@ module.exports = {
       .setFooter(botName, botAvatar) // v13 usa (texto, icono)
       .setDescription(
         `**•  __Producto__:** Reward Boost 🔮\n\n` +
-        `**•  Link:** ||https://gofile.io/d/g0W8UD||\n\n` +
+        `**•  Link:** ||https://discord.com/channels/1469618754282586154/1469861946135416872||\n\n` +
         `Déjanos por favor una reseña para poder seguir creciendo!`
       );
 

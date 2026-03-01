@@ -39,7 +39,7 @@ module.exports = {
       .setDescription(
         `**•  __Producto__:** Discord Account\n\n` +
         `**•  Account(s):** ||${account}||\n` +
-        `**•  Login:** [Haz Click Aqui](https://canary.discord.com/login)\n\n` +
+        `**•  Gmx:** [Haz Click Aqui](https://www.gmx.es/consentpage)\n\n` +
         `Déjanos por favor una reseña para poder seguir creciendo!`
       );
 

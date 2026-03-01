@@ -20,7 +20,7 @@ module.exports = {
     // Verificar permisos
     if (!interaction.member.roles.cache.has(requiredRoleId)) {
       return interaction.reply({ 
-        content: "<:warninghost:1383935369275379874> | No tienes permiso para usar este comando.", 
+        content " | No tienes permiso para usar este comando.", 
         ephemeral: true 
       });
     }
@@ -39,7 +39,7 @@ module.exports = {
       .setDescription(
         `**•  __Producto__:** 027 Woofer\n\n` +
         `**•  Key(s):** ||${key}||\n` +
-        `**•  Download:** ||||\n\n` +
+        `**•  Download:** ||https://discord.com/channels/1469618754282586154/1477545538718142616||\n\n` +
         `Déjanos por favor una reseña para poder seguir creciendo! `
       );
 
