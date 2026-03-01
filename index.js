@@ -41,7 +41,7 @@ try {
     console.error("❌ Error cargando el Handler:", error);
 }
 
-// --- 🛠️ CONFIGURACIÓN DE IDs (Mantenidas) ---
+// --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
 const canalTranscriptsId = "1473454832567320768"; 
 const canalLogsId = "1470928427199631412"; 
@@ -89,24 +89,62 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE (MEJORADO)
+// 🕹️ EVENTO: INTERACTION CREATE
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
+        // --- SLASH COMMANDS ---
+        if (interaction.isCommand()) {
+            const command = client.slashCommands.get(interaction.commandName);
+            if (command) return await command.run(client, interaction);
+
+            if (interaction.commandName === "renvembed") {
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+                
+                const embedPanel = new MessageEmbed()
+                    .setTitle("📩 CENTRO DE ATENCIÓN Y PARTNERS")
+                    .setDescription("Selecciona una categoría para abrir un ticket o verificar tu partner.\n\n🛒 **Compras:** Para adquirir productos.\n🛠 **Soporte:** Dudas generales.\n🤝 **Partner:** Si cumples los requisitos.\n✅ **Verificar Partner:** Si ya tienes el canal del AD puesto.")
+                    .setColor("#2f3136");
+                
+                const row = new MessageActionRow().addComponents(
+                    new MessageButton().setCustomId("ticket_compra").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
+                    new MessageButton().setCustomId("ticket_soporte").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
+                    new MessageButton().setCustomId("ticket_partner").setLabel("Solicitar Partner").setStyle("SUCCESS").setEmoji("🤝"),
+                    new MessageButton().setCustomId("verificar_partner").setLabel("Auto-Partner").setStyle("DANGER").setEmoji("✅")
+                );
+                
+                await interaction.channel.send({ embeds: [embedPanel], components: [row] });
+                return interaction.reply({ content: "✅ Panel enviado correctamente.", ephemeral: true });
+            }
+
+            if (["reseller", "customer", "ultra"].includes(interaction.commandName)) {
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+                const targetUser = interaction.options.getMember('usuario');
+                let rolId = interaction.commandName === "reseller" ? "1473471902810112062" : (interaction.commandName === "customer" ? "1470894748041482416" : "1470865175866507394");
+                let prefijo = interaction.commandName.charAt(0).toUpperCase() + interaction.commandName.slice(1);
+                
+                try {
+                    await targetUser.roles.add(rolId);
+                    await targetUser.setNickname(`${prefijo} | ${targetUser.user.username}`).catch(() => {});
+                    return interaction.reply({ embeds: [new MessageEmbed().setTitle(`🎉 Rango ${prefijo} Asignado`).setColor("GREEN").setDescription(`¡Hola ${targetUser}! Ya tienes tu rango.`).setTimestamp()] });
+                } catch (e) { return interaction.reply({ content: "❌ Error de jerarquía.", ephemeral: true }); }
+            }
+        }
+
         // --- BOTONES ---
         if (interaction.isButton()) {
             const { customId, member, user, guild } = interaction;
             
-            // Reparación de Auto-Partner (Evita Interacción Fallida)
             if (customId === "verificar_partner") {
-                await interaction.deferReply({ ephemeral: true });
-                if (member.roles.cache.has(rolPartnerAutoId)) return interaction.editReply({ content: "✅ Ya eres Partner." });
-                
+                await interaction.deferReply({ ephemeral: true }); 
+                if (member.roles.cache.has(rolPartnerAutoId)) return interaction.editReply({ content: "✅ Ya tienes el rango de Partner." });
+
                 try {
                     await member.roles.add(rolPartnerAutoId);
-                    return interaction.editReply({ content: "🎉 ¡Rol asignado correctamente! Ya puedes ver la sección de partners." });
+                    return interaction.editReply({ content: "🎉 ¡Verificado! Ahora tienes acceso a la sección de partners." });
                 } catch (e) {
-                    return interaction.editReply({ content: "❌ Error de jerarquía. Sube mi rol por encima del rol de Partner." });
+                    console.error(e);
+                    return interaction.editReply({ content: "❌ No pude darte el rol. Revisa que mi rol esté arriba del de Partner en Ajustes del Servidor." });
                 }
             }
 
@@ -122,26 +160,25 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.showModal(modalCierre);
             }
 
-            // Abrir Modales de Tickets con múltiples campos
             if (customId.startsWith("ticket_")) {
                 const tipo = customId.split('_')[1];
                 const modal = new Modal().setCustomId(`modal_${tipo}`).setTitle(`Formulario de ${tipo.toUpperCase()}`);
                 
                 if (tipo === "compra") {
                     modal.addComponents(
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_1').setLabel("¿Qué producto deseas?").setStyle('SHORT').setRequired(true)),
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_2').setLabel("¿Qué método de pago usarás?").setStyle('SHORT').setRequired(true))
+                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_producto').setLabel("¿Qué producto deseas?").setStyle('SHORT').setRequired(true)),
+                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Qué método de pago usarás?").setStyle('SHORT').setRequired(true))
                     );
                 } else {
                     modal.addComponents(
-                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_1').setLabel("Escribe tu duda o motivo").setStyle('PARAGRAPH').setRequired(true))
+                        new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_detalle').setLabel("Escribe tu duda o motivo").setStyle('PARAGRAPH').setRequired(true))
                     );
                 }
                 return await interaction.showModal(modal);
             }
         }
 
-        // --- SUBMIT DE MODALES (DISEÑO DE TICKET MEJORADO) ---
+        // --- MODAL SUBMIT ---
         if (interaction.isModalSubmit()) {
             const { customId, user, guild, channel, fields } = interaction;
             
@@ -159,28 +196,27 @@ client.on('interactionCreate', async (interaction) => {
                     ]
                 });
 
-                // DISEÑO DE EMBED TICKET (Similar a la imagen proporcionada)
                 const embedTicket = new MessageEmbed()
                     .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
-                    .setTitle("SISTEMA DE TICKETS")
-                    .setDescription(`¡Bienvenido/a ${user}! El Staff te atenderá pronto.\nPor favor, danos los detalles necesarios.`)
+                    .setTitle("🎫 NUEVO TICKET GENERADO")
+                    .setDescription(`¡Hola ${user}! Gracias por contactarnos.\nEl Staff te atenderá lo antes posible.`)
                     .setColor("#2f3136")
-                    .setThumbnail("https://i.imgur.com/Tu7vI7h.png") // Icono de discord amarillo como en tu imagen
+                    .setThumbnail("https://i.imgur.com/Tu7vI7h.png")
                     .addFields(
-                        { name: "Categoría", value: `\`${tipo.toUpperCase()}\``, inline: true },
-                        { name: "ID del Ticket", value: `\`${Math.floor(Math.random() * 900000000)}\``, inline: true },
-                        { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
-                        { name: "Usuario", value: `${user.tag} (${user.id})`, inline: false }
+                        { name: "👤 Usuario", value: `${user.tag} (\`${user.id}\`)`, inline: false },
+                        { name: "📁 Categoría", value: `\`${tipo.toUpperCase()}\``, inline: true },
+                        { name: "📅 Fecha", value: `\`${moment().format('DD/MM/YYYY')}\``, inline: true }
                     );
 
-                // Agregar campos personalizados según el tipo
                 if (tipo === "compra") {
                     embedTicket.addFields(
-                        { name: "📦 Producto", value: `\`${fields.getTextInputValue('p_1')}\``, inline: true },
-                        { name: "💳 Método", value: `\`${fields.getTextInputValue('p_2')}\``, inline: true }
+                        { name: "📦 Producto Solicitado", value: `\`\`\`${fields.getTextInputValue('p_producto')}\`\`\``, inline: false },
+                        { name: "💳 Método de Pago", value: `\`${fields.getTextInputValue('p_metodo')}\``, inline: true }
                     );
                 } else {
-                    embedTicket.addFields({ name: "📝 Detalles", value: fields.getTextInputValue('p_1'), inline: false });
+                    embedTicket.addFields(
+                        { name: "📝 Detalles / Motivo", value: `\`\`\`${fields.getTextInputValue('p_detalle')}\`\`\``, inline: false }
+                    );
                 }
 
                 embedTicket.setFooter({ text: "710 Shop - Gestión de Tickets" }).setTimestamp();
@@ -191,7 +227,7 @@ client.on('interactionCreate', async (interaction) => {
                 );
 
                 await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
-                return interaction.editReply(`✅ Ticket creado correctamente: ${nChannel}`);
+                return interaction.editReply(`✅ Canal creado: ${nChannel}`);
             }
 
             if (customId === 'modal_nota_cierre') {
@@ -209,35 +245,12 @@ client.on('interactionCreate', async (interaction) => {
 });
 
 // ==========================================
-// 📡 AUDITORÍA COMPLETA (LOGS)
+// 📡 AUDITORÍA (LOGS)
 // ==========================================
-client.on('messageDelete', m => {
-    if (!m.guild || m.author?.bot) return;
-    enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("RED").addFields({ name: "Autor", value: `${m.author.tag}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: m.content || "Sin texto" }).setTimestamp());
-});
-
-client.on('messageUpdate', (o, n) => {
-    if (!o.guild || o.author?.bot || o.content === n.content) return;
-    enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("YELLOW").addFields({ name: "Autor", value: `${o.author.tag}` }, { name: "Antes", value: o.content || "Vacío" }, { name: "Después", value: n.content || "Vacío" }).setTimestamp());
-});
-
-client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setDescription(`Nombre: **${c.name}**\nTipo: ${c.type}`).setColor("GREEN").setTimestamp()));
+client.on('messageDelete', m => { if (!m.guild || m.author?.bot) return; enviarLog(new MessageEmbed().setTitle("🗑️ Mensaje Borrado").setColor("RED").addFields({ name: "Autor", value: `${m.author.tag}`, inline: true }, { name: "Canal", value: `${m.channel}`, inline: true }, { name: "Contenido", value: m.content || "Sin texto" }).setTimestamp()); });
+client.on('messageUpdate', (o, n) => { if (!o.guild || o.author?.bot || o.content === n.content) return; enviarLog(new MessageEmbed().setTitle("✏️ Mensaje Editado").setColor("YELLOW").addFields({ name: "Autor", value: `${o.author.tag}` }, { name: "Antes", value: o.content || "Vacío" }, { name: "Después", value: n.content || "Vacío" }).setTimestamp()); });
+client.on('channelCreate', c => enviarLog(new MessageEmbed().setTitle("🆕 Canal Creado").setDescription(`Nombre: **${c.name}**`).setColor("GREEN").setTimestamp()));
 client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🚫 Canal Eliminado").setDescription(`Nombre: **${c.name}**`).setColor("RED").setTimestamp()));
-
-client.on('roleCreate', r => enviarLog(new MessageEmbed().setTitle("🎭 Rol Creado").setDescription(`Nombre: ${r.name}`).setColor("GREEN").setTimestamp()));
-client.on('roleDelete', r => enviarLog(new MessageEmbed().setTitle("🔥 Rol Eliminado").setDescription(`Nombre: ${r.name}`).setColor("RED").setTimestamp()));
-
-client.on('guildMemberUpdate', (o, n) => {
-    const addedRoles = n.roles.cache.filter(r => !o.roles.cache.has(r.id));
-    const removedRoles = o.roles.cache.filter(r => !n.roles.cache.has(r.id));
-    addedRoles.forEach(r => enviarLog(new MessageEmbed().setTitle("✅ Rol Añadido").setDescription(`A: ${n.user.tag}\nRol: ${r.name}`).setColor("BLUE").setTimestamp()));
-    removedRoles.forEach(r => enviarLog(new MessageEmbed().setTitle("❌ Rol Quitado").setDescription(`A: ${n.user.tag}\nRol: ${r.name}`).setColor("DARK_RED").setTimestamp()));
-});
-
-client.on('voiceStateUpdate', (o, n) => {
-    if (!o.channelId && n.channelId) enviarLog(new MessageEmbed().setTitle("🔊 Entró a Voz").setDescription(`${n.member.user.tag} entró a ${n.channel.name}`).setColor("AQUA").setTimestamp());
-    if (o.channelId && !n.channelId) enviarLog(new MessageEmbed().setTitle("🔇 Salió de Voz").setDescription(`${o.member.user.tag} salió de ${o.channel.name}`).setColor("GREY").setTimestamp());
-});
 
 // ==========================================
 // 🚀 INICIO
@@ -246,13 +259,11 @@ client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - OPERATIVO`);
     const guild = client.guilds.cache.get(ID_SERVIDOR);
     if (guild) {
-        // Registro de comandos para evitar el "está pensando"
         await guild.commands.set([
-            { name: 'reseller', description: 'Asignar rango Reseller', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario a asignar' }] },
-            { name: 'customer', description: 'Asignar rango Customer', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario a asignar' }] },
-            { name: 'ultra', description: 'Asignar rango Ultra', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario a asignar' }] },
+            { name: 'reseller', description: 'Asignar rango Reseller', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
+            { name: 'customer', description: 'Asignar rango Customer', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
+            { name: 'ultra', description: 'Asignar rango Ultra', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
             { name: 'renvembed', description: 'Re-enviar el panel de tickets' },
-            { name: 'embed', description: 'Comando de prueba embed' },
             { name: 'mp', description: 'Ver métodos de pago' }
         ]);
     }
