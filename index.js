@@ -148,36 +148,40 @@ const enviarLog = (embed) => {
 
 // ==========================================
 
+// ==========================================
+// 👋 EVENTO: BIENVENIDAS ESTILO PROFESIONAL
+// ==========================================
 client.on('guildMemberAdd', async (member) => {
-
+    // 1. Buscamos el canal de bienvenidas usando el ID que ya configuraste arriba
     const canal = member.guild.channels.cache.get(canalWelcomeId) || await member.guild.channels.fetch(canalWelcomeId).catch(() => null);
-
     
-
     if (canal) {
+        // 2. Formateamos las fechas para que se vean elegantes en español
+        const createdDate = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:D>`; // Fecha corta
+        const createdRelative = `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`; // "hace x años"
+        const joinedDate = `<t:${Math.floor(Date.now() / 1000)}:f>`; // Fecha completa con hora
 
         const embedWelcome = new MessageEmbed()
-
-            .setTitle("👋 ¡Bienvenido a 710 Bot Shop!")
-
-            .setDescription(`Hola ${member}, gracias por unirte a **${member.guild.name}**.\n\n> No olvides leer las normas y abrir un ticket si deseas comprar algo.`)
-
+            .setAuthor({ name: `${member.guild.name} | Sistema de Ingresos`, iconURL: member.guild.iconURL({ dynamic: true }) })
+            .setTitle(`🎉 ¡Bienvenido/a al servidor!`)
+            .setDescription(`¡Hola ${member}, estamos muy emocionados de tenerte aquí! Pásala genial en **${member.guild.name}**. 💬`)
             .setColor("#2f3136")
-
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-
-            .setImage("https://i.imgur.com/Tu7vI7h.png")
-
-            .setFooter({ text: `Eres el miembro número ${member.guild.memberCount}` })
-
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+            .addFields(
+                { name: "📛 Usuario:", value: `**${member.user.tag}**`, inline: true },
+                { name: "🆔 ID:", value: `\`${member.id}\``, inline: true },
+                { name: "📅 Cuenta creada:", value: `${createdDate} (${createdRelative})`, inline: false },
+                { name: "📥 Se unió el:", value: `${joinedDate}`, inline: false },
+                { name: "👥 Total miembros:", value: `**${member.guild.memberCount}**`, inline: true },
+                { name: "🔢 Eres el número:", value: `**#${member.guild.memberCount}**`, inline: true },
+                { name: "📜 Reglas:", value: `No olvides leer las normas en <#1469950357785546853>`, inline: false }
+            )
+            .setFooter({ text: `710 Bot Shop • Disfruta tu estadía`, iconURL: member.guild.iconURL() })
             .setTimestamp();
-
         
-
-        canal.send({ content: `¡Bienvenido/a ${member}! 🚀`, embeds: [embedWelcome] }).catch(console.error);
-
+        // 3. Enviamos el mensaje mencionando al usuario
+        canal.send({ content: `👋 **¡Bienvenido ${member}!**`, embeds: [embedWelcome] }).catch(console.error);
     }
-
 });
 
 
