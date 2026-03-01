@@ -35,6 +35,7 @@ try {
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
 const canalTranscriptsId = "1473454832567320768"; 
+const canalLogsId = "1470928427199631412"; // Asegúrate que este ID sea correcto
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
     SOPORTE: "1469621686155346042", 
@@ -53,6 +54,11 @@ function updateRanking(userId, userTag) {
     fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
 }
 
+const enviarLog = (embed) => {
+    const canal = client.channels.cache.get(canalLogsId);
+    if (canal) canal.send({ embeds: [embed] }).catch(() => {});
+};
+
 // ==========================================
 // 🕹️ EVENTO: INTERACTION CREATE
 // ==========================================
@@ -65,7 +71,6 @@ client.on('interactionCreate', async (interaction) => {
             if (command) {
                 return await command.run(client, interaction);
             } else if (interaction.commandName === "mp") {
-                // Comando /mp de emergencia si no está en carpeta commands
                 const embedPagos = new MessageEmbed()
                     .setTitle("💳 MÉTODOS DE PAGO")
                     .setColor("#5865F2")
@@ -78,6 +83,23 @@ client.on('interactionCreate', async (interaction) => {
         // --- 2. BOTONES ---
         if (interaction.isButton()) {
             const { customId, guild, channel, user, member } = interaction;
+
+            // --- LÓGICA PARTNER AUTOMÁTICO ---
+            if (customId === "verificar_partner") {
+                const rolPartnerId = "147101000000000000"; // 👈 REEMPLAZA CON EL ID REAL DEL ROL PARTNER
+                
+                if (member.roles.cache.has(rolPartnerId)) {
+                    return interaction.reply({ content: "✅ Ya tienes el rol de Partner.", ephemeral: true });
+                }
+
+                try {
+                    await member.roles.add(rolPartnerId);
+                    return interaction.reply({ content: "🎉 ¡Felicidades! Se te ha asignado el rol de **Partner** correctamente.", ephemeral: true });
+                } catch (e) {
+                    console.error(e);
+                    return interaction.reply({ content: "❌ No pude asignarte el rol. Verifica que mi rol esté por encima del de Partner.", ephemeral: true });
+                }
+            }
 
             if (customId === "asumir") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
@@ -97,7 +119,6 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.reply({ content: `🔔 ${user} solicita tu atención.` });
             }
 
-            // Apertura de tickets desde panel
             if (customId.startsWith("ticket_")) {
                 const tipo = customId.split('_')[1];
                 const modalT = new Modal().setCustomId(`modal_${tipo}`).setTitle('Abrir Ticket');
@@ -121,15 +142,14 @@ client.on('interactionCreate', async (interaction) => {
             if (customId.startsWith('modal_')) {
                 await interaction.deferReply({ ephemeral: true });
                 
-                // Contador
                 if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }));
                 let cData = JSON.parse(fs.readFileSync(contadorPath));
                 cData.count++;
                 fs.writeFileSync(contadorPath, JSON.stringify(cData));
 
-                const tipo = customId.split('_')[1].toUpperCase();
+                const tipoRaw = customId.split('_')[1];
                 const nChannel = await guild.channels.create(`ticket-${user.username}`, {
-                    parent: CATEGORIAS[tipo] || CATEGORIAS.SOPORTE,
+                    parent: CATEGORIAS[tipoRaw.toUpperCase()] || CATEGORIAS.SOPORTE,
                     permissionOverwrites: [
                         { id: guild.id, deny: ['VIEW_CHANNEL'] },
                         { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
@@ -137,17 +157,17 @@ client.on('interactionCreate', async (interaction) => {
                     ]
                 });
 
-                // DISEÑO PROFESIONAL
                 const embedT = new MessageEmbed()
                     .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
                     .setTitle("SISTEMA DE TICKETS")
                     .setColor("#2f3136")
+                    .setThumbnail(user.displayAvatarURL({ dynamic: true }))
                     .addFields(
-                        { name: "Categoría", value: `\`${tipo}\``, inline: true },
+                        { name: "Categoría", value: `\`${tipoRaw.toUpperCase()}\``, inline: true },
                         { name: "ID del Ticket", value: `\`${cData.count}${user.id.slice(-4)}\``, inline: true },
                         { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
                         { name: "Usuario", value: `\`${user.tag}\` (${user.id})` },
-                        { name: "❓ Ayuda", value: `\`${fields.getTextInputValue('p_duda')}\`` }
+                        { name: "❓ Ayuda", value: `\`\`\`${fields.getTextInputValue('p_duda')}\`\`\`` }
                     )
                     .setFooter({ text: "710 Shop - Gestión de Tickets" });
 
@@ -166,9 +186,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-
-client.login(process.env.TOKEN || config.token);
-// --- LÓGICA DE LOGS Y EVENTOS SIGUE IGUAL ---
+// --- LÓGICA DE LOGS Y EVENTOS ---
 
 client.on('messageCreate', m => {
     if (!m.guild || m.author.bot || m.channel.id === canalLogsId) return;
@@ -214,6 +232,7 @@ client.on('guildMemberUpdate', (o, n) => {
 });
 
 client.on('guildMemberAdd', m => {
+    if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }));
     const data = JSON.parse(fs.readFileSync(contadorPath, 'utf8'));
     data.count += 1;
     fs.writeFileSync(contadorPath, JSON.stringify(data, null, 2));
@@ -228,7 +247,6 @@ client.on('guildMemberRemove', m => {
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - VIGILANCIA TOTAL ACTIVADA`);
 
-    // --- BLOQUE DE CONEXIÓN A VOZ ---
     const { joinVoiceChannel } = require('@discordjs/voice');
     const ID_CANAL_VOZ = '1475258262692827354'; 
     const ID_SERVIDOR = '1469618754282586154'; 
@@ -240,7 +258,7 @@ client.on('ready', async () => {
                 channelId: canal.id,
                 guildId: ID_SERVIDOR,
                 adapterCreator: canal.guild.voiceAdapterCreator,
-                selfDeaf: true, // Ensordecido
+                selfDeaf: true,
                 selfMute: false,
             });
             console.log(`🎙️ Bot conectado a voz en: ${canal.name}`);
@@ -248,36 +266,27 @@ client.on('ready', async () => {
     } catch (error) {
         console.error("❌ Error al conectar a voz:", error);
     }
-    // --- FIN BLOQUE VOZ ---
 
-    // --- REGISTRO DE COMANDOS ---
     try {
-        const comandosParaRegistrar = client.slashCommands
-            .filter(cmd => cmd.data)
-            .map(cmd => cmd.data.toJSON());
-        
         const comandosManuales = [
-            { name: 'renvembed', description: 'Reenvía el último mensaje del bot y borra el viejo', type: 'CHAT_INPUT' },
-            { name: 'clearpanel', description: 'Muestra el panel para limpiar tus mensajes directos', type: 'CHAT_INPUT' },
-            { name: 'comandlist', description: 'Muestra la lista de comandos y sus permisos', type: 'CHAT_INPUT' },
-            { name: 'rankingstaff', description: 'Muestra el top de Staff con más tickets asumidos', type: 'CHAT_INPUT' },
-            { name: 'rankingreset', description: 'Resetea el ranking de Staff (Solo Admins)', type: 'CHAT_INPUT' }
+            { name: 'renvembed', description: 'Reenvía el último mensaje del bot y borra el viejo' },
+            { name: 'clearpanel', description: 'Muestra el panel para limpiar tus mensajes directos' },
+            { name: 'comandlist', description: 'Muestra la lista de comandos y sus permisos' },
+            { name: 'rankingstaff', description: 'Muestra el top de Staff con más tickets asumidos' },
+            { name: 'rankingreset', description: 'Resetea el ranking de Staff (Solo Admins)' },
+            { name: 'mp', description: 'Muestra los métodos de pago' }
         ];
 
-        const listaFinal = [...comandosParaRegistrar, ...comandosManuales];
         const guild = client.guilds.cache.get(ID_SERVIDOR);
-        
         if (guild) {
-            await guild.commands.set(listaFinal);
-            console.log(`✅ Comandos Slash registrados en el servidor: ${guild.name}`);
+            await guild.commands.set(comandosManuales);
+            console.log(`✅ Comandos Slash registrados en: ${guild.name}`);
         }
         
     } catch (error) {
         console.error("❌ Error al registrar comandos:", error);
     }
     
-    // --- LOG DE ENCENDIDO ---
-    // Nota: Si usas discord.js v13, asegúrate de tener definida la variable Discord o usa MessageEmbed directamente
     const embedReady = new MessageEmbed()
         .setTitle("✅ Bot Encendido Correctamente")
         .setColor("GREEN")
@@ -288,10 +297,7 @@ client.on('ready', async () => {
         )
         .setTimestamp();
     
-    // Solo envía el log si la función existe
-    if (typeof enviarLog === 'function') {
-        enviarLog(embedReady);
-    }
+    enviarLog(embedReady);
 });
 
 client.login(process.env.TOKEN || config.token);
