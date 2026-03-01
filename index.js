@@ -262,15 +262,15 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             // Lógica para tickets (Se añadió la excepción de modal_embed_custom para que no cree canal)
+            // Lógica para tickets (Corregida la sintaxis del emojiPrefix)
             if (customId.startsWith('modal_') && customId !== 'modal_nota_cierre' && customId !== 'modal_embed_custom') {
                 await interaction.deferReply({ ephemeral: true });
                 const tipo = customId.split('_')[1];
                 const nombreLimpio = user.username.replace(/[^a-zA-Z0-9]/g, "") || user.id;
                 const idTicketAleatorio = Math.floor(1000000000 + Math.random() * 9000000000);
 
-                let emojiPrefix = "";
-                if (tipo === "compra") emojiPrefix = "🛒buy-";
-                else if (tipo === "soporte") emojiPrefix = "🛠support-" : (tipo === "partner") ? "🤝partner-" : `${tipo}-`;
+                // --- LINEA CORREGIDA AQUÍ ---
+                let emojiPrefix = (tipo === "compra") ? "🛒buy-" : (tipo === "soporte") ? "🛠support-" : (tipo === "partner") ? "🤝partner-" : `${tipo}-`;
 
                 const nChannel = await guild.channels.create(`${emojiPrefix}${nombreLimpio}`, {
                     parent: CATEGORIAS[tipo.toUpperCase()],
@@ -314,17 +314,6 @@ client.on('interactionCreate', async (interaction) => {
 
                 await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
                 return interaction.editReply(`✅ Canal creado: ${nChannel}`);
-            }
-
-            if (customId === 'modal_nota_cierre') {
-                await interaction.deferReply();
-                const transcript = await transcripts.createTranscript(channel);
-                await client.channels.cache.get(canalTranscriptsId).send({ 
-                    content: `Transcript de ${channel.name} | Cerrado por ${user.tag}`,
-                    files: [transcript] 
-                });
-                await interaction.editReply("🔒 Cerrando ticket...");
-                setTimeout(() => channel.delete().catch(() => {}), 3000);
             }
         }
     } catch (err) { console.error("Interaction Error:", err); }
