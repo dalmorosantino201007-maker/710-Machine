@@ -22,9 +22,9 @@ const sqlite3 = require('sqlite3').verbose();
 moment.locale('es');
 
 // --- 🗄️ BASE DE DATOS ---
+// Asegúrate de que la carpeta DataBaseJson exista manualmente
 const db = new sqlite3.Database('./DataBaseJson/tickets.db');
 db.serialize(() => {
-    // Añadimos la columna channelId para que el bot reconozca tickets tras reiniciarse
     db.run(`CREATE TABLE IF NOT EXISTS tickets (
         id INTEGER PRIMARY KEY AUTOINCREMENT, 
         creatorId TEXT, 
@@ -160,7 +160,6 @@ client.on('interactionCreate', async (interaction) => {
                     ];
                 }
 
-                // Verificar si ya tiene un ticket abierto en la DB
                 db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
                     if (row && interaction.guild.channels.cache.has(row.channelId)) {
                         return interaction.reply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>`, ephemeral: true });
@@ -204,7 +203,7 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            // Lógica de apertura de Modales
+            // --- MOVIDO FUERA DE LA DB PARA QUE RESPONDA RÁPIDO ---
             if (opc === "opc1") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
@@ -235,7 +234,7 @@ client.on('interactionCreate', async (interaction) => {
 
             // Lógica de botones DENTRO del ticket
             db.get(`SELECT * FROM tickets WHERE channelId = ?`, [interaction.channel.id], async (err, ticket) => {
-                if (!ticket) return; // Si no es un canal de ticket, ignorar
+                if (!ticket) return;
 
                 if (opc === "claim_ticket") {
                     if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el personal puede reclamar tickets.", ephemeral: true });
@@ -251,7 +250,7 @@ client.on('interactionCreate', async (interaction) => {
                         creador.send(`🔔 **Atención:** El staff te está esperando en tu ticket: ${interaction.channel}`).catch(() => {});
                         return interaction.reply({ content: "✅ Se ha enviado un MD al creador del ticket.", ephemeral: true });
                     }
-                    return interaction.reply({ content: "❌ No pude enviar el mensaje (MDs cerrados).", ephemeral: true });
+                    return interaction.reply({ content: "❌ No pude enviar el mensaje.", ephemeral: true });
                 }
 
                 if (opc === "fechar_ticket") {
@@ -299,9 +298,8 @@ client.on('messageDelete', async (message) => {
     if (!message.guild || message.author?.bot) return;
     const embed = new MessageEmbed()
         .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto (posible imagen o embed)_"}`)
-        .setColor("RED")
-        .setTimestamp();
+        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto_"}`)
+        .setColor("RED").setTimestamp();
     enviarLog(embed);
 });
 
@@ -310,8 +308,7 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
     const embed = new MessageEmbed()
         .setAuthor({ name: `Mensaje Editado`, iconURL: oldMessage.author.displayAvatarURL({ dynamic: true }) })
         .setDescription(`**Autor:** ${oldMessage.author}\n**Canal:** ${oldMessage.channel}\n\n**Antes:**\n${oldMessage.content}\n\n**Después:**\n${newMessage.content}`)
-        .setColor("YELLOW")
-        .setTimestamp();
+        .setColor("YELLOW").setTimestamp();
     enviarLog(embed);
 });
 
@@ -319,7 +316,6 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - ONLINE`);
     
-    // Auto-unirse al canal de voz si está configurado
     const guild = client.guilds.cache.get(ID_SERVIDOR);
     if (guild) {
         const voiceChannel = guild.channels.cache.get(canalVozId);
