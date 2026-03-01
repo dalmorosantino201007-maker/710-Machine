@@ -21,8 +21,6 @@ const otplib = require('otplib');
 // Carga de configuración
 const config = require('./DataBaseJson/config.json');
 
-// ... (El resto de tu código)S
-
 moment.locale('es');
 
 const client = new Client({
@@ -36,7 +34,7 @@ if (!fs.existsSync(contadorPath)) {
     fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }, null, 2));
 }
 
-// --- 🏆 SISTEMA DE RANKING STAFF (NUEVO) ---
+// --- 🏆 SISTEMA DE RANKING STAFF ---
 const rankingPath = './DataBaseJson/ranking.json';
 if (!fs.existsSync(rankingPath)) {
     fs.writeFileSync(rankingPath, JSON.stringify({}, null, 2));
@@ -48,7 +46,7 @@ function updateRanking(userId, userTag) {
         ranking[userId] = { tag: userTag, tickets: 0 };
     }
     ranking[userId].tickets += 1;
-    ranking[userId].tag = userTag; // Mantener tag actualizado
+    ranking[userId].tag = userTag;
     fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
 }
 
@@ -60,13 +58,12 @@ cron.schedule('0 0 * * *', () => {
 client.slashCommands = new Collection();
 require('./handler')(client);
 
-
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
 const canalLogsId = "1470928427199631412"; 
 const canalTranscriptsId = "1473454832567320768"; 
 const canalReviewsId = "1475613791252119684";     
-const rolAdminReenvio = "1469618981781373042"; // Rol para /renvembed
+const rolAdminReenvio = "1469618981781373042"; 
 
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
@@ -87,15 +84,14 @@ const enviarLog = (embed) => {
 };
 
 // ==========================================
-// 🕹️ LÓGICA DE INTERACCIONES (TICKETS Y COMANDOS)
+// 🕹️ LÓGICA DE INTERACCIONES
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
-    // Extraemos lo necesario de la interacción
     const { customId, fields, guild, channel, user, commandName, member } = interaction;
 
     try {
-        // --- 1. LÓGICA DE COMANDOS SLASH ---
+        // --- 1. COMANDOS SLASH ---
         if (interaction.isCommand()) {
             if (commandName === "mp") {
                 const embedPagos = new MessageEmbed()
@@ -112,7 +108,7 @@ client.on('interactionCreate', async (interaction) => {
                     )
                     .setFooter({ text: "⚠️ Envía el comprobante para validar tu pedido." })
                     .setTimestamp();
-                return await interaction.reply({ embeds: [embedPagos], ephemeral: false });
+                return await interaction.reply({ embeds: [embedPagos] });
             }
 
             if (commandName === "renvembed") {
@@ -131,7 +127,7 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- 2. LÓGICA DE BOTONES ---
+        // --- 2. BOTONES ---
         if (interaction.isButton()) {
             if (customId === "boton_pago_mp" || customId === "metodos_pago") {
                 const embedBotonMP = new MessageEmbed()
@@ -172,6 +168,7 @@ client.on('interactionCreate', async (interaction) => {
 
             if (customId === "asumir") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
+                updateRanking(user.id, user.tag); // Actualizar ranking al asumir
                 await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
                 return channel.setName(`atendido-${user.username}`).catch(() => {});
             }
@@ -179,7 +176,7 @@ client.on('interactionCreate', async (interaction) => {
             if (customId === "fechar_ticket") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
                 const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
-                modalNota.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('nota_staff').setLabel("Nota de cierre").setStyle('PARAGRAPH')));
+                modalNota.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('nota_staff').setLabel("Nota de cierre").setStyle('PARAGRAPH').setRequired(false)));
                 return await interaction.showModal(modalNota);
             }
 
@@ -189,8 +186,35 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- 3. LÓGICA DE MODALES (SUBMIT) ---
+        // --- 3. MODALES (SUBMIT) ---
         if (interaction.isModalSubmit()) {
+            // Lógica para cerrar ticket (NUEVO)
+            if (customId === 'modal_nota_cierre') {
+                await interaction.deferReply();
+                const nota = fields.getTextInputValue('nota_staff') || "Sin nota.";
+                
+                const attachment = await transcripts.createTranscript(channel, {
+                    limit: -1,
+                    fileName: `transcript-${channel.name}.html`,
+                    returnBuffer: false
+                });
+
+                const logEmbed = new MessageEmbed()
+                    .setTitle("🔒 TICKET CERRADO")
+                    .setColor("#ED4245")
+                    .addFields(
+                        { name: "Canal:", value: `${channel.name}`, inline: true },
+                        { name: "Cerrado por:", value: `${user.tag}`, inline: true },
+                        { name: "Nota:", value: `\`\`\`${nota}\`\`\`` }
+                    )
+                    .setTimestamp();
+
+                await client.channels.cache.get(canalTranscriptsId).send({ embeds: [logEmbed], files: [attachment] });
+                await interaction.editReply("✅ Ticket cerrado correctamente. El canal se eliminará en breve.");
+                setTimeout(() => channel.delete().catch(() => {}), 5000);
+            }
+
+            // Lógica para crear tickets
             if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(customId)) {
                 await interaction.deferReply({ ephemeral: true });
 
