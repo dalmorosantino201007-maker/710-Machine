@@ -25,6 +25,10 @@ const client = new Client({
     partials: ["MESSAGE", "CHANNEL", "REACTION", "USER", "GUILD_MEMBER"],
 });
 
+// --- 📂 HANDLER DE COMANDOS ---
+client.slashCommands = new Collection();
+require('./handler')(client);
+
 // --- 🛠️ SISTEMAS DE DATOS ---
 const contadorPath = './DataBaseJson/contador.json';
 if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }));
@@ -39,10 +43,6 @@ function updateRanking(userId, userTag) {
     ranking[userId].tag = userTag;
     fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
 }
-
-// --- 📂 HANDLER DE COMANDOS ---
-client.slashCommands = new Collection();
-require('./handler')(client); // Asegúrate de que esto cargue tus comandos como /rankingstaff
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
@@ -59,32 +59,35 @@ const CATEGORIAS = {
 // ==========================================
 
 client.on('interactionCreate', async (interaction) => {
-    const { customId, fields, guild, channel, user, commandName, member } = interaction;
-
-    // --- 1. COMANDOS SLASH (Handler) ---
+    
+    // --- 1. PROCESAR TODOS LOS COMANDOS SLASH (Handler) ---
     if (interaction.isCommand()) {
-        const slashCommand = client.slashCommands.get(commandName);
+        const command = client.slashCommands.get(interaction.commandName);
         
-        // Comandos integrados en index
-        if (commandName === "mp") {
+        // Si el comando existe en el Handler, lo ejecutamos y salimos
+        if (command) {
+            return command.run(client, interaction);
+        }
+
+        // Si es el comando /mp y no está en el handler, lo ejecutamos aquí
+        if (interaction.commandName === "mp") {
             const embedPagos = new MessageEmbed()
                 .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
                 .setTitle("💳 INFORMACIÓN DE PAGOS")
                 .setColor("#5865F2")
                 .addFields(
                     { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
-                    { name: "📌 CVU / Alias:", value: "```0000003100072461415651``` / ```710shop```", inline: false }
+                    { name: "📌 CVU / Alias:", value: "```0000003100072461415651```\n/\n```710shop```", inline: false }
                 )
                 .setTimestamp();
             return await interaction.reply({ embeds: [embedPagos] });
         }
-
-        // Ejecutar comandos de la carpeta /commands
-        if (slashCommand) return slashCommand.run(client, interaction);
     }
 
-    // --- 2. BOTONES ---
+    // --- 2. LÓGICA DE BOTONES ---
     if (interaction.isButton()) {
+        const { customId, guild, channel, user, member } = interaction;
+
         if (customId === "asumir") {
             if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
             updateRanking(user.id, user.tag);
@@ -104,68 +107,73 @@ client.on('interactionCreate', async (interaction) => {
             return interaction.reply({ content: `🔔 ${user} solicita tu atención inmediata en este ticket.` });
         }
 
-        // Lógica de apertura de tickets
-        if (customId.startsWith("ticket_")) {
-            const modal = new Modal().setCustomId(`modal_${customId.split('_')[1]}`).setTitle('Información del Ticket');
-            modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿En qué podemos ayudarte?").setStyle('PARAGRAPH').setRequired(true)));
+        // Abrir modal al tocar botón de ticket en el panel
+        if (customId === "ticket_compra" || customId === "ticket_soporte" || customId === "ticket_partner") {
+            const tipo = customId.split('_')[1];
+            const modal = new Modal().setCustomId(`modal_${tipo}`).setTitle('Información del Ticket');
+            modal.addComponents(new MessageActionRow().addComponents(
+                new TextInputComponent().setCustomId('p_duda').setLabel("¿En qué podemos ayudarte?").setStyle('PARAGRAPH').setRequired(true)
+            ));
             return await interaction.showModal(modal);
         }
     }
 
-    // --- 3. MODALES ---
+    // --- 3. LÓGICA DE MODALES (SUBMIT) ---
     if (interaction.isModalSubmit()) {
-        // Cierre de ticket
+        const { customId, fields, guild, channel, user } = interaction;
+
         if (customId === 'modal_nota_cierre') {
             await interaction.deferReply();
-            const transcript = await transcripts.createTranscript(channel);
-            await client.channels.cache.get(canalTranscriptsId).send({ content: `Transcript: ${channel.name}`, files: [transcript] });
+            const attachment = await transcripts.createTranscript(channel);
+            await client.channels.cache.get(canalTranscriptsId).send({ content: `Transcript de ${channel.name}`, files: [attachment] });
             await interaction.editReply("✅ Cerrando ticket...");
-            return setTimeout(() => channel.delete(), 5000);
+            return setTimeout(() => channel.delete().catch(() => {}), 5000);
         }
 
-        // Creación de ticket con diseño profesional
         if (customId.startsWith('modal_')) {
             await interaction.deferReply({ ephemeral: true });
 
+            // Contador de Tickets
             let countData = JSON.parse(fs.readFileSync(contadorPath));
             countData.count++;
             fs.writeFileSync(contadorPath, JSON.stringify(countData));
 
-            const catID = CATEGORIAS[customId.split('_')[1].toUpperCase()] || CATEGORIAS.SOPORTE;
-            
+            const categoriaNombre = customId.split('_')[1];
+            const catID = CATEGORIAS[categoriaNombre.toUpperCase()] || CATEGORIAS.SOPORTE;
+
             const nChannel = await guild.channels.create(`ticket-${user.username}`, {
                 parent: catID,
                 permissionOverwrites: [
                     { id: guild.id, deny: ['VIEW_CHANNEL'] },
-                    { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] },
+                    { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
                     { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
                 ]
             });
 
-            // DISEÑO DE TICKET SOLICITADO
+            // DISEÑO DE TICKET PROFESIONAL (Imagen de referencia)
             const embedTicket = new MessageEmbed()
                 .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
                 .setTitle("SISTEMA DE TICKETS")
                 .setColor("#2f3136")
                 .setDescription(`¡Bienvenido/a <@${user.id}>! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
                 .addFields(
-                    { name: "Categoría", value: `\`${customId.split('_')[1].toUpperCase()}\``, inline: true },
-                    { name: "ID del Ticket", value: `\`#${countData.count}${user.id.slice(-4)}\``, inline: true },
+                    { name: "Categoría", value: `\`${categoriaNombre.charAt(0).toUpperCase() + categoriaNombre.slice(1)}\``, inline: true },
+                    { name: "ID del Ticket", value: `\`${countData.count}${user.id.slice(-5)}\``, inline: true },
                     { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
-                    { name: "Usuario", value: `${user.tag} (${user.id})` },
-                    { name: "❓ Detalles", value: `\`${fields.getTextInputValue('p_duda')}\`` }
+                    { name: "Usuario", value: `\`${user.tag}\` (${user.id})` },
+                    { name: "❓ Ayuda", value: `\`${fields.getTextInputValue('p_duda')}\`` }
                 )
-                .setThumbnail("https://i.imgur.com/8D76S66.png") // Icono similar al de Discord
+                .setThumbnail("https://cdn.discordapp.com/emojis/1101912444583153724.png") 
                 .setFooter({ text: `710 Shop - Gestión de Tickets • ${moment().format('HH:mm')}` });
 
             const row = new MessageActionRow().addComponents(
                 new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
                 new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("🔔")
+                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("📢")
             );
 
             await nChannel.send({ content: `<@${user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
-            await interaction.editReply(`✅ Ticket abierto: ${nChannel}`);
+            await interaction.editReply(`✅ Ticket abierto correctamente: ${nChannel}`);
         }
     }
 });
