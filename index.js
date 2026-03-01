@@ -7,8 +7,7 @@ const {
     MessageActionRow, 
     MessageButton, 
     Modal, 
-    TextInputComponent, 
-    MessageSelectMenu 
+    TextInputComponent 
 } = require('discord.js');
 
 const fs = require('fs');
@@ -16,9 +15,7 @@ const path = require('path');
 const moment = require('moment');
 const cron = require('node-cron');
 const transcripts = require('discord-html-transcripts'); 
-const otplib = require('otplib'); 
 
-// Carga de configuración
 const config = require('./DataBaseJson/config.json');
 
 moment.locale('es');
@@ -28,59 +25,33 @@ const client = new Client({
     partials: ["MESSAGE", "CHANNEL", "REACTION", "USER", "GUILD_MEMBER"],
 });
 
-// --- 🛠️ SISTEMA DE CONTADOR ---
+// --- 🛠️ SISTEMAS DE DATOS ---
 const contadorPath = './DataBaseJson/contador.json';
-if (!fs.existsSync(contadorPath)) {
-    fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }, null, 2));
-}
+if (!fs.existsSync(contadorPath)) fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }));
 
-// --- 🏆 SISTEMA DE RANKING STAFF ---
 const rankingPath = './DataBaseJson/ranking.json';
-if (!fs.existsSync(rankingPath)) {
-    fs.writeFileSync(rankingPath, JSON.stringify({}, null, 2));
-}
+if (!fs.existsSync(rankingPath)) fs.writeFileSync(rankingPath, JSON.stringify({}));
 
 function updateRanking(userId, userTag) {
     let ranking = JSON.parse(fs.readFileSync(rankingPath, 'utf8'));
-    if (!ranking[userId]) {
-        ranking[userId] = { tag: userTag, tickets: 0 };
-    }
+    if (!ranking[userId]) ranking[userId] = { tag: userTag, tickets: 0 };
     ranking[userId].tickets += 1;
     ranking[userId].tag = userTag;
     fs.writeFileSync(rankingPath, JSON.stringify(ranking, null, 2));
 }
 
-cron.schedule('0 0 * * *', () => {
-    fs.writeFileSync(contadorPath, JSON.stringify({ count: 0 }, null, 2));
-    console.log("✅ Contador diario reiniciado.");
-}, { timezone: "America/Argentina/Buenos_Aires" });
-
+// --- 📂 HANDLER DE COMANDOS ---
 client.slashCommands = new Collection();
-require('./handler')(client);
+require('./handler')(client); // Asegúrate de que esto cargue tus comandos como /rankingstaff
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
 const canalLogsId = "1470928427199631412"; 
 const canalTranscriptsId = "1473454832567320768"; 
-const canalReviewsId = "1475613791252119684";     
-const rolAdminReenvio = "1469618981781373042"; 
-
 const CATEGORIAS = {
     COMPRA: "1469945642909438114",  
     SOPORTE: "1469621686155346042", 
     PARTNER: "1471010330229477528"  
-};
-
-// --- IMPORTAR BIENVENIDAS ---
-const welcomePath = path.join(__dirname, 'Events', 'welcome.js');
-if (fs.existsSync(welcomePath)) {
-    require('./Events/welcome')(client);
-    console.log("✅ welcome.js cargado correctamente");
-}
-
-const enviarLog = (embed) => {
-    const canal = client.channels.cache.get(canalLogsId);
-    if (canal) canal.send({ embeds: [embed] }).catch(() => {});
 };
 
 // ==========================================
@@ -90,197 +61,111 @@ const enviarLog = (embed) => {
 client.on('interactionCreate', async (interaction) => {
     const { customId, fields, guild, channel, user, commandName, member } = interaction;
 
-    try {
-        // --- 1. COMANDOS SLASH ---
-        if (interaction.isCommand()) {
-            if (commandName === "mp") {
-                const embedPagos = new MessageEmbed()
-                    .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
-                    .setTitle("💳 INFORMACIÓN DE PAGOS")
-                    .setColor("#5865F2")
-                    .addFields(
-                        { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
-                        { name: "💳 Mercado Pago", value: "\u200B", inline: false },
-                        { name: "📌 CVU:", value: "```0000003100072461415651```", inline: true },
-                        { name: "🏷️ Alias:", value: "```710shop```", inline: true },
-                        { name: "👤 Titular:", value: "```Santino Dal Moro```", inline: true },
-                        { name: "🏦 Banco:", value: "```Mercado Pago```", inline: true }
-                    )
-                    .setFooter({ text: "⚠️ Envía el comprobante para validar tu pedido." })
-                    .setTimestamp();
-                return await interaction.reply({ embeds: [embedPagos] });
-            }
-
-            if (commandName === "renvembed") {
-                if (!member.roles.cache.has(rolAdminReenvio)) return interaction.reply({ content: "❌ No tienes permisos.", ephemeral: true });
-                const mensajes = await channel.messages.fetch({ limit: 50 });
-                const ultimoEmbed = mensajes.find(m => m.author.id === client.user.id && m.embeds.length > 0);
-                if (!ultimoEmbed) return interaction.reply({ content: "❌ No encontré el embed.", ephemeral: true });
-                await channel.send({ embeds: ultimoEmbed.embeds, components: ultimoEmbed.components });
-                await ultimoEmbed.delete().catch(() => {});
-                return interaction.reply({ content: "✅ Embed reenviado.", ephemeral: true });
-            }
-
-            if (commandName === "clearpanel") {
-                const rowClear = new MessageActionRow().addComponents(new MessageButton().setCustomId("limpiar_dm_proceso").setLabel("Limpiar DM").setStyle("DANGER").setEmoji("🧹"));
-                return interaction.reply({ embeds: [new MessageEmbed().setTitle("🧹 Limpieza").setColor("#f39c12").setDescription("Presiona para limpiar tus DMs.")], components: [rowClear] });
-            }
+    // --- 1. COMANDOS SLASH (Handler) ---
+    if (interaction.isCommand()) {
+        const slashCommand = client.slashCommands.get(commandName);
+        
+        // Comandos integrados en index
+        if (commandName === "mp") {
+            const embedPagos = new MessageEmbed()
+                .setAuthor({ name: '710 | Machine - Métodos de Pago', iconURL: client.user.displayAvatarURL() })
+                .setTitle("💳 INFORMACIÓN DE PAGOS")
+                .setColor("#5865F2")
+                .addFields(
+                    { name: "💙 PayPal", value: "```la710storeshop@gmail.com```", inline: false },
+                    { name: "📌 CVU / Alias:", value: "```0000003100072461415651``` / ```710shop```", inline: false }
+                )
+                .setTimestamp();
+            return await interaction.reply({ embeds: [embedPagos] });
         }
 
-        // --- 2. BOTONES ---
-        if (interaction.isButton()) {
-            if (customId === "boton_pago_mp" || customId === "metodos_pago") {
-                const embedBotonMP = new MessageEmbed()
-                    .setTitle("💳 DATOS DE MERCADO PAGO")
-                    .setColor("#009EE3")
-                    .addFields(
-                        { name: "📌 CVU:", value: "```0000003100072461415651```", inline: false },
-                        { name: "🏷️ Alias:", value: "```710shop```", inline: false },
-                        { name: "👤 Titular:", value: "```Santino Dal Moro```", inline: false }
-                    );
-                return await interaction.reply({ embeds: [embedBotonMP], ephemeral: true });
-            }
+        // Ejecutar comandos de la carpeta /commands
+        if (slashCommand) return slashCommand.run(client, interaction);
+    }
 
-            if (customId === "ticket_compra") {
-                const modal = new Modal().setCustomId('modal_compra').setTitle('Formulario de Compra');
-                modal.addComponents(
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_prod').setLabel("¿Qué deseas comprar?").setStyle('SHORT').setRequired(true)),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_metodo').setLabel("¿Método de pago?").setStyle('SHORT').setRequired(true)),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_cant').setLabel("¿Cantidad?").setStyle('SHORT').setRequired(true))
-                );
-                return await interaction.showModal(modal);
-            }
-
-            if (customId === "ticket_soporte") {
-                const modal = new Modal().setCustomId('modal_soporte').setTitle('Centro de Soporte');
-                modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿Ayuda?").setStyle('PARAGRAPH').setRequired(true)));
-                return await interaction.showModal(modal);
-            }
-
-            if (customId === "ticket_partner") {
-                const modal = new Modal().setCustomId('modal_partner').setTitle('Solicitud de Partner');
-                modal.addComponents(
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_add').setLabel("¿Añadiste el add?").setStyle('SHORT').setRequired(true)),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_link').setLabel("Link de tu server").setStyle('SHORT').setRequired(true))
-                );
-                return await interaction.showModal(modal);
-            }
-
-            if (customId === "asumir") {
-                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
-                updateRanking(user.id, user.tag); // Actualizar ranking al asumir
-                await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
-                return channel.setName(`atendido-${user.username}`).catch(() => {});
-            }
-
-            if (customId === "fechar_ticket") {
-                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-                const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
-                modalNota.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('nota_staff').setLabel("Nota de cierre").setStyle('PARAGRAPH').setRequired(false)));
-                return await interaction.showModal(modalNota);
-            }
-
-            if (customId === "notificar") {
-                if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-                return interaction.reply({ content: "🔔 El Staff solicita tu atención inmediata." });
-            }
+    // --- 2. BOTONES ---
+    if (interaction.isButton()) {
+        if (customId === "asumir") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No eres Staff.", ephemeral: true });
+            updateRanking(user.id, user.tag);
+            await interaction.reply({ content: `✅ El Staff ${user} ha asumido este ticket.` });
+            return channel.setName(`atendido-${user.username}`).catch(() => {});
         }
 
-        // --- 3. MODALES (SUBMIT) ---
-        if (interaction.isModalSubmit()) {
-            // Lógica para cerrar ticket (NUEVO)
-            if (customId === 'modal_nota_cierre') {
-                await interaction.deferReply();
-                const nota = fields.getTextInputValue('nota_staff') || "Sin nota.";
-                
-                const attachment = await transcripts.createTranscript(channel, {
-                    limit: -1,
-                    fileName: `transcript-${channel.name}.html`,
-                    returnBuffer: false
-                });
-
-                const logEmbed = new MessageEmbed()
-                    .setTitle("🔒 TICKET CERRADO")
-                    .setColor("#ED4245")
-                    .addFields(
-                        { name: "Canal:", value: `${channel.name}`, inline: true },
-                        { name: "Cerrado por:", value: `${user.tag}`, inline: true },
-                        { name: "Nota:", value: `\`\`\`${nota}\`\`\`` }
-                    )
-                    .setTimestamp();
-
-                await client.channels.cache.get(canalTranscriptsId).send({ embeds: [logEmbed], files: [attachment] });
-                await interaction.editReply("✅ Ticket cerrado correctamente. El canal se eliminará en breve.");
-                setTimeout(() => channel.delete().catch(() => {}), 5000);
-            }
-
-            // Lógica para crear tickets
-            if (['modal_compra', 'modal_soporte', 'modal_partner'].includes(customId)) {
-                await interaction.deferReply({ ephemeral: true });
-
-                let cId = CATEGORIAS.COMPRA;
-                let nText = `🛒-buy-${user.username}`;
-                let tEmbed = "🛒 NUEVA ORDEN DE COMPRA";
-                let colEmbed = "#57F287";
-                let extra = [];
-
-                if (customId === 'modal_compra') {
-                    extra = [
-                        { name: '📦 Producto:', value: `\`${fields.getTextInputValue('p_prod')}\``, inline: true },
-                        { name: '💳 Método:', value: `\`${fields.getTextInputValue('p_metodo')}\``, inline: true },
-                        { name: '🔢 Cantidad:', value: `\`${fields.getTextInputValue('p_cant')}\``, inline: true }
-                    ];
-                } else if (customId === 'modal_soporte') {
-                    cId = CATEGORIAS.SOPORTE;
-                    nText = `🛠️-soporte-${user.username}`;
-                    tEmbed = "🛠️ CENTRO DE SOPORTE";
-                    colEmbed = "#5865F2";
-                    extra = [{ name: '❓ Consulta:', value: `\`${fields.getTextInputValue('p_duda')}\``, inline: false }];
-                } else if (customId === 'modal_partner') {
-                    cId = CATEGORIAS.PARTNER;
-                    nText = `🤝-partner-${user.username}`;
-                    tEmbed = "🤝 SOLICITUD DE PARTNER";
-                    colEmbed = "#EB459E";
-                    extra = [
-                        { name: '📢 Add:', value: `\`${fields.getTextInputValue('p_add')}\``, inline: true },
-                        { name: '🔗 Link:', value: `\`${fields.getTextInputValue('p_link')}\``, inline: true }
-                    ];
-                }
-
-                const nChannel = await guild.channels.create(nText, {
-                    type: 'GUILD_TEXT',
-                    parent: cId,
-                    permissionOverwrites: [
-                        { id: guild.id, deny: ['VIEW_CHANNEL'] },
-                        { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES'] },
-                        { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
-                    ]
-                });
-
-                const embedTicket = new MessageEmbed()
-                    .setTitle(tEmbed)
-                    .setColor(colEmbed)
-                    .setThumbnail(user.displayAvatarURL({ dynamic: true }))
-                    .setDescription(`Hola ${user}, bienvenido.\n\n> El staff te atenderá pronto.`)
-                    .addFields({ name: "👤 Cliente:", value: `${user}`, inline: true }, ...extra)
-                    .setFooter({ text: "710 | Machine Services" })
-                    .setTimestamp();
-
-                const row = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
-                    new MessageButton().setCustomId("boton_pago_mp").setLabel("Pagos").setStyle("PRIMARY").setEmoji("💳"),
-                    new MessageButton().setCustomId("notificar").setLabel("Avisar").setStyle("SECONDARY").setEmoji("🔔"),
-                    new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒")
-                );
-
-                await nChannel.send({ content: `${user} | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
-                return await interaction.editReply(`✅ Ticket creado: ${nChannel}`);
-            }
+        if (customId === "fechar_ticket") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+            const modalNota = new Modal().setCustomId('modal_nota_cierre').setTitle('Finalizar Ticket');
+            modalNota.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('nota_staff').setLabel("Nota de cierre").setStyle('PARAGRAPH')));
+            return await interaction.showModal(modalNota);
         }
-    } catch (e) {
-        console.error("Error en interacción:", e);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: "❌ Ocurrió un error al procesar la interacción.", ephemeral: true }).catch(() => {});
+
+        if (customId === "notificar") {
+            if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+            return interaction.reply({ content: `🔔 ${user} solicita tu atención inmediata en este ticket.` });
+        }
+
+        // Lógica de apertura de tickets
+        if (customId.startsWith("ticket_")) {
+            const modal = new Modal().setCustomId(`modal_${customId.split('_')[1]}`).setTitle('Información del Ticket');
+            modal.addComponents(new MessageActionRow().addComponents(new TextInputComponent().setCustomId('p_duda').setLabel("¿En qué podemos ayudarte?").setStyle('PARAGRAPH').setRequired(true)));
+            return await interaction.showModal(modal);
+        }
+    }
+
+    // --- 3. MODALES ---
+    if (interaction.isModalSubmit()) {
+        // Cierre de ticket
+        if (customId === 'modal_nota_cierre') {
+            await interaction.deferReply();
+            const transcript = await transcripts.createTranscript(channel);
+            await client.channels.cache.get(canalTranscriptsId).send({ content: `Transcript: ${channel.name}`, files: [transcript] });
+            await interaction.editReply("✅ Cerrando ticket...");
+            return setTimeout(() => channel.delete(), 5000);
+        }
+
+        // Creación de ticket con diseño profesional
+        if (customId.startsWith('modal_')) {
+            await interaction.deferReply({ ephemeral: true });
+
+            let countData = JSON.parse(fs.readFileSync(contadorPath));
+            countData.count++;
+            fs.writeFileSync(contadorPath, JSON.stringify(countData));
+
+            const catID = CATEGORIAS[customId.split('_')[1].toUpperCase()] || CATEGORIAS.SOPORTE;
+            
+            const nChannel = await guild.channels.create(`ticket-${user.username}`, {
+                parent: catID,
+                permissionOverwrites: [
+                    { id: guild.id, deny: ['VIEW_CHANNEL'] },
+                    { id: user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] },
+                    { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
+                ]
+            });
+
+            // DISEÑO DE TICKET SOLICITADO
+            const embedTicket = new MessageEmbed()
+                .setAuthor({ name: "710 Bot Shop", iconURL: client.user.displayAvatarURL() })
+                .setTitle("SISTEMA DE TICKETS")
+                .setColor("#2f3136")
+                .setDescription(`¡Bienvenido/a <@${user.id}>! El Staff te atenderá pronto. Por favor, danos los detalles necesarios.`)
+                .addFields(
+                    { name: "Categoría", value: `\`${customId.split('_')[1].toUpperCase()}\``, inline: true },
+                    { name: "ID del Ticket", value: `\`#${countData.count}${user.id.slice(-4)}\``, inline: true },
+                    { name: "Fecha", value: `\`${moment().format('DD/MM/YYYY HH:mm')}\``, inline: true },
+                    { name: "Usuario", value: `${user.tag} (${user.id})` },
+                    { name: "❓ Detalles", value: `\`${fields.getTextInputValue('p_duda')}\`` }
+                )
+                .setThumbnail("https://i.imgur.com/8D76S66.png") // Icono similar al de Discord
+                .setFooter({ text: `710 Shop - Gestión de Tickets • ${moment().format('HH:mm')}` });
+
+            const row = new MessageActionRow().addComponents(
+                new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setStyle("DANGER").setEmoji("🔒"),
+                new MessageButton().setCustomId("asumir").setLabel("Asumir").setStyle("SUCCESS").setEmoji("✅"),
+                new MessageButton().setCustomId("notificar").setLabel("Notificar").setStyle("SECONDARY").setEmoji("🔔")
+            );
+
+            await nChannel.send({ content: `<@${user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [row] });
+            await interaction.editReply(`✅ Ticket abierto: ${nChannel}`);
         }
     }
 });
