@@ -60,7 +60,6 @@ cron.schedule('0 0 * * *', () => {
 client.slashCommands = new Collection();
 require('./handler')(client);
 
-const { MessageEmbed, MessageActionRow, MessageButton, Modal, TextInputComponent } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
