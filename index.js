@@ -60,8 +60,6 @@ cron.schedule('0 0 * * *', () => {
 client.slashCommands = new Collection();
 require('./handler')(client);
 
-const fs = require('fs');
-const path = require('path');
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
