@@ -15,6 +15,7 @@ const path = require('path');
 const moment = require('moment');
 const transcripts = require('discord-html-transcripts'); 
 const config = require('./DataBaseJson/config.json');
+const { authenticator } = require('otplib'); // 🔐 NUEVO: Librería para el 2FA
 
 moment.locale('es');
 
@@ -43,6 +44,7 @@ try {
 
 // --- 🛠️ CONFIGURACIÓN DE IDs ---
 const rolPermitidoId = "1469967630365622403"; 
+const canalVozId = "1475258262692827354";
 const canalTranscriptsId = "1473454832567320768"; 
 const canalLogsId = "1470928427199631412"; 
 const canalWelcomeId = "1469953972197654570"; 
@@ -108,17 +110,15 @@ client.on('guildMemberAdd', async (member) => {
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- 1. GESTIÓN DE SLASH COMMANDS (CON FRENO) ---
+        // --- 1. GESTIÓN DE SLASH COMMANDS ---
         if (interaction.isCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             
-            // Si el comando existe en el Handler (como embed.js), se ejecuta y se detiene
             if (command) {
                 await command.run(client, interaction);
-                return; // FRENO: No sigue leyendo hacia abajo
+                return; 
             }
 
-            // Comandos manuales en index.js
             if (interaction.commandName === "renvembed") {
                 if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
                 
@@ -136,7 +136,25 @@ client.on('interactionCreate', async (interaction) => {
                 
                 await interaction.channel.send({ embeds: [embedPanel], components: [row] });
                 await interaction.reply({ content: "✅ Panel enviado correctamente.", ephemeral: true });
-                return; // FRENO: No sigue leyendo
+                return; 
+            }
+
+            // --- COMANDO PARA EL PANEL 2FA ---
+            if (interaction.commandName === "2facode") {
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+
+                const embed2FA = new MessageEmbed()
+                    .setTitle("🔐 GENERADOR DE CÓDIGOS 2FA")
+                    .setDescription("Obtén tu código de verificación al instante.\n\nPresiona el botón e introduce tu **Secret Key** para generar el código de 6 dígitos.")
+                    .setColor("#f08221")
+                    .setFooter({ text: "Sistema de Seguridad 710 Shop" });
+
+                const row2FA = new MessageActionRow().addComponents(
+                    new MessageButton().setCustomId("btn_2fa_generar").setLabel("Generar Código").setStyle("SUCCESS").setEmoji("🔑")
+                );
+
+                await interaction.channel.send({ embeds: [embed2FA], components: [row2FA] });
+                return interaction.reply({ content: "✅ Panel 2FA enviado.", ephemeral: true });
             }
             return; 
         }
@@ -145,6 +163,20 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             const { customId, member, user, guild } = interaction;
             
+            // Botón del 2FA
+            if (customId === "btn_2fa_generar") {
+                const modal2FA = new Modal().setCustomId('modal_auth_2fa').setTitle('Generar Código 2FA');
+                const inputSecret = new TextInputComponent()
+                    .setCustomId('secret_input')
+                    .setLabel("Introduce tu Secret Key (Base32)")
+                    .setStyle('SHORT')
+                    .setPlaceholder('Ejemplo: JBSWY3DPEHPK3PXP')
+                    .setRequired(true);
+
+                modal2FA.addComponents(new MessageActionRow().addComponents(inputSecret));
+                return await interaction.showModal(modal2FA);
+            }
+
             if (customId === "notificar_usuario") {
                 if (!member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el Staff puede usar esto.", ephemeral: true });
                 await interaction.channel.send({ content: `🔔 **Atención:** El Staff solicita tu presencia en este ticket, <@${interaction.channel.topic}>.` });
@@ -193,7 +225,44 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isModalSubmit()) {
             const { customId, user, guild, channel, fields } = interaction;
             
-            if (customId.startsWith('modal_') && customId !== 'modal_nota_cierre') {
+            // Lógica para procesar la Secret Key y dar el código
+            if (customId === 'modal_auth_2fa') {
+                const secret = fields.getTextInputValue('secret_input').replace(/\s+/g, ''); // Limpiar espacios
+                try {
+                    const token = authenticator.generate(secret);
+                    const timeLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+
+                    const embedCode = new MessageEmbed()
+                        .setTitle("🔑 CÓDIGO GENERADO")
+                        .setDescription(`Tu código de verificación es:\n# \`${token}\``)
+                        .addField("⏳ Expira en", `\`${timeLeft} segundos\``)
+                        .setColor("GREEN")
+                        .setFooter({ text: "Seguridad 710 Shop" });
+
+                    return interaction.reply({ embeds: [embedCode], ephemeral: true });
+                } catch (e) {
+                    return interaction.reply({ content: "❌ **Error:** La Secret Key es inválida. Asegúrate de copiarla bien.", ephemeral: true });
+                }
+            }
+
+            // --- NUEVA LÓGICA PARA EMBEDS (SOLO ESTO SE AÑADIÓ) ---
+            if (customId === 'modal_embed_custom') {
+                const titulo = fields.getTextInputValue('titulo_embed');
+                const descripcion = fields.getTextInputValue('desc_embed');
+                const color = fields.getTextInputValue('color_embed') || "#2f3136";
+
+                const embedGenerado = new MessageEmbed()
+                    .setTitle(titulo)
+                    .setDescription(descripcion)
+                    .setColor(color)
+                    .setTimestamp();
+
+                await channel.send({ embeds: [embedGenerado] });
+                return interaction.reply({ content: "✅ Embed enviado correctamente.", ephemeral: true });
+            }
+
+            // Lógica para tickets (Se añadió la excepción de modal_embed_custom para que no cree canal)
+            if (customId.startsWith('modal_') && customId !== 'modal_nota_cierre' && customId !== 'modal_embed_custom') {
                 await interaction.deferReply({ ephemeral: true });
                 const tipo = customId.split('_')[1];
                 const nombreLimpio = user.username.replace(/[^a-zA-Z0-9]/g, "") || user.id;
@@ -201,9 +270,7 @@ client.on('interactionCreate', async (interaction) => {
 
                 let emojiPrefix = "";
                 if (tipo === "compra") emojiPrefix = "🛒buy-";
-                else if (tipo === "soporte") emojiPrefix = "🛠support-";
-                else if (tipo === "partner") emojiPrefix = "🤝partner-";
-                else emojiPrefix = `${tipo}-`;
+                else if (tipo === "soporte") emojiPrefix = "🛠support-" : (tipo === "partner") ? "🤝partner-" : `${tipo}-`;
 
                 const nChannel = await guild.channels.create(`${emojiPrefix}${nombreLimpio}`, {
                     parent: CATEGORIAS[tipo.toUpperCase()],
@@ -276,14 +343,38 @@ client.on('channelDelete', c => enviarLog(new MessageEmbed().setTitle("🚫 Cana
 // ==========================================
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - OPERATIVO`);
+    
     const guild = client.guilds.cache.get(ID_SERVIDOR);
+    
+    // --- CONEXIÓN AUTOMÁTICA AL CANAL DE VOZ ---
     if (guild) {
+        const voiceChannel = guild.channels.cache.get(canalVozId);
+        
+        if (voiceChannel && voiceChannel.type === 'GUILD_VOICE') {
+            const { joinVoiceChannel } = require('@discordjs/voice');
+            
+            try {
+                joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: guild.id,
+                    adapterCreator: guild.voiceAdapterCreator,
+                    selfDeaf: true, // 🎧 ESTO LO ENSORDECE
+                    selfMute: true  // 🎤 TAMBIÉN LO SILENCIA
+                });
+                console.log(`🔊 Conectado y ensordecido en: ${voiceChannel.name}`);
+            } catch (error) {
+                console.error("❌ Error al conectar al canal de voz:", error);
+            }
+        }
+
+        // Registro de comandos (Mantenemos los tuyos)
         await guild.commands.set([
             { name: 'reseller', description: 'Asignar rango Reseller', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
             { name: 'customer', description: 'Asignar rango Customer', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
             { name: 'ultra', description: 'Asignar rango Ultra', options: [{ name: 'usuario', type: 'USER', required: true, description: 'Usuario' }] },
             { name: 'renvembed', description: 'Re-enviar el panel de tickets' },
-            { name: 'embed', description: 'Enviar un mensaje personalizado' }, // Se añade descripción aquí
+            { name: 'embed', description: 'Enviar un mensaje personalizado' },
+            { name: '2facode', description: 'Enviar el panel generador de 2FA' },
             { name: 'mp', description: 'Ver métodos de pago' }
         ]);
     }
