@@ -103,109 +103,16 @@ client.on('guildMemberAdd', async (member) => {
 // ==========================================
 // 🕹️ EVENTO: INTERACTION CREATE
 // ==========================================
+// ==========================================
+// 🕹️ EVENTO: INTERACTION CREATE (CORREGIDO)
+// ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        if (interaction.isCommand()) {
-            const command = client.slashCommands.get(interaction.commandName);
-            if (command) return await command.run(client, interaction);
-
-            if (interaction.commandName === "renvembed") {
-                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
-                const embedPanel = new MessageEmbed()
-                    .setTitle("📩 CENTRO DE ATENCIÓN")
-                    .setDescription("Selecciona una opción para abrir un ticket.")
-                    .setColor("#2f3136");
-                const row = new MessageActionRow().addComponents(
-                    new MessageButton().setCustomId("opc1").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
-                    new MessageButton().setCustomId("opc2").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
-                    new MessageButton().setCustomId("opc3").setLabel("Partner").setStyle("SUCCESS").setEmoji("🤝")
-                );
-                await interaction.channel.send({ embeds: [embedPanel], components: [row] });
-                return interaction.reply({ content: "✅ Panel enviado.", ephemeral: true });
-            }
-        }
-
-        if (interaction.isModalSubmit()) {
-            // USAMOS deferReply PARA EVITAR QUE LA INTERACCIÓN EXPIRE MIENTRAS CREAMOS EL CANAL
-            await interaction.deferReply({ ephemeral: true });
-
-            if (interaction.customId.startsWith("modal_")) {
-                const opc = interaction.customId;
-                let nome, categoria, ticketKey, respuestas = [];
-
-                if (opc === "modal_opc1") {
-                    nome = `🛒・${interaction.user.username}`;
-                    categoria = CATEGORIAS.COMPRA;
-                    ticketKey = "Compra";
-                    respuestas = [
-                        { name: "🛒 Producto:", value: interaction.fields.getTextInputValue("producto") },
-                        { name: "💳 Método de pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
-                        { name: "📄 Cantidad:", value: interaction.fields.getTextInputValue("cantidad_compra") }
-                    ];
-                } else if (opc === "modal_opc2") {
-                    nome = `🛠・${interaction.user.username}`;
-                    categoria = CATEGORIAS.SOPORTE;
-                    ticketKey = "Soporte";
-                    respuestas = [
-                        { name: "🔨 Producto:", value: interaction.fields.getTextInputValue("producto") },
-                        { name: "⚠️ Problema:", value: interaction.fields.getTextInputValue("problema") },
-                        { name: "📄 Info adicional:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
-                    ];
-                } else if (opc === "modal_opc3") {
-                    nome = `🤝・${interaction.user.username}`;
-                    categoria = CATEGORIAS.PARTNER;
-                    ticketKey = "Partner";
-                    respuestas = [
-                        { name: "🌐 Servidor:", value: interaction.fields.getTextInputValue("servidor") },
-                        { name: "👥 ¿+250 Miembros?:", value: interaction.fields.getTextInputValue("miembros") },
-                        { name: "🎯 Ya envio nuestro ad:", value: interaction.fields.getTextInputValue("nuestroad") }
-                    ];
-                }
-
-                db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
-                    if (row && interaction.guild.channels.cache.has(row.channelId)) {
-                        return interaction.editReply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>` });
-                    }
-
-                    const ch = await interaction.guild.channels.create(nome, {
-                        type: 'GUILD_TEXT',
-                        parent: categoria,
-                        permissionOverwrites: [
-                            { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
-                            { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES', 'EMBED_LINKS'] },
-                            { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
-                        ]
-                    });
-
-                    db.run(`INSERT INTO tickets (creatorId, channelId) VALUES (?, ?)`, [interaction.user.id, ch.id], function(err) {
-                        const ticketDbId = this.lastID;
-                        
-                        const embedTicket = new MessageEmbed()
-                            .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
-                            .addFields(
-                                { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
-                                { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
-                                { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
-                            ).setTimestamp();
-
-                        const controlButtons = new MessageActionRow().addComponents(
-                            new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
-                            new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
-                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
-                        );
-
-                        ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] });
-                        ch.send({ embeds: [new MessageEmbed().setTitle("📋 Datos del Formulario").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
-                        interaction.editReply({ content: `✅ Ticket creado con éxito: ${ch}` });
-                    });
-                });
-            }
-        }
-
+        // --- 1. PRIORIDAD: BOTONES (Para evitar "Interacción Fallida" en Modales) ---
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            // --- ESTOS MODALES DEBEN MOSTRARSE ANTES QUE CUALQUIER OTRA LÓGICA ---
+            // Mostrar Modales (DEBE SER INSTANTÁNEO)
             if (opc === "opc1") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
@@ -264,10 +171,107 @@ client.on('interactionCreate', async (interaction) => {
                 }
             });
         }
-    } catch (err) { console.error(err); }
+
+        // --- 2. COMANDOS ---
+        if (interaction.isCommand()) {
+            const command = client.slashCommands.get(interaction.commandName);
+            if (command) return await command.run(client, interaction);
+
+            if (interaction.commandName === "renvembed") {
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+                const embedPanel = new MessageEmbed()
+                    .setTitle("📩 CENTRO DE ATENCIÓN")
+                    .setDescription("Selecciona una opción para abrir un ticket.")
+                    .setColor("#2f3136");
+                const row = new MessageActionRow().addComponents(
+                    new MessageButton().setCustomId("opc1").setLabel("Compras").setStyle("PRIMARY").setEmoji("🛒"),
+                    new MessageButton().setCustomId("opc2").setLabel("Soporte").setStyle("SECONDARY").setEmoji("🛠"),
+                    new MessageButton().setCustomId("opc3").setLabel("Partner").setStyle("SUCCESS").setEmoji("🤝")
+                );
+                await interaction.channel.send({ embeds: [embedPanel], components: [row] });
+                return interaction.reply({ content: "✅ Panel enviado.", ephemeral: true });
+            }
+        }
+
+        // --- 3. ENVÍO DE FORMULARIOS (MODALS) ---
+        if (interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith("modal_")) {
+                await interaction.deferReply({ ephemeral: true }); 
+
+                const opc = interaction.customId;
+                let nome, categoria, ticketKey, respuestas = [];
+
+                if (opc === "modal_opc1") {
+                    nome = `🛒・${interaction.user.username}`;
+                    categoria = CATEGORIAS.COMPRA;
+                    ticketKey = "Compra";
+                    respuestas = [
+                        { name: "🛒 Producto:", value: interaction.fields.getTextInputValue("producto") },
+                        { name: "💳 Método de pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
+                        { name: "📄 Cantidad:", value: interaction.fields.getTextInputValue("cantidad_compra") }
+                    ];
+                } else if (opc === "modal_opc2") {
+                    nome = `🛠・${interaction.user.username}`;
+                    categoria = CATEGORIAS.SOPORTE;
+                    ticketKey = "Soporte";
+                    respuestas = [
+                        { name: "🔨 Producto:", value: interaction.fields.getTextInputValue("producto") },
+                        { name: "⚠️ Problema:", value: interaction.fields.getTextInputValue("problema") },
+                        { name: "📄 Info adicional:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
+                    ];
+                } else if (opc === "modal_opc3") {
+                    nome = `🤝・${interaction.user.username}`;
+                    categoria = CATEGORIAS.PARTNER;
+                    ticketKey = "Partner";
+                    respuestas = [
+                        { name: "🌐 Servidor:", value: interaction.fields.getTextInputValue("servidor") },
+                        { name: "👥 ¿+250 Miembros?:", value: interaction.fields.getTextInputValue("miembros") },
+                        { name: "🎯 Ya envio nuestro ad:", value: interaction.fields.getTextInputValue("nuestroad") }
+                    ];
+                }
+
+                db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
+                    if (row && interaction.guild.channels.cache.has(row.channelId)) {
+                        return interaction.editReply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>` });
+                    }
+
+                    const ch = await interaction.guild.channels.create(nome, {
+                        type: 'GUILD_TEXT',
+                        parent: categoria,
+                        permissionOverwrites: [
+                            { id: interaction.guild.id, deny: ['VIEW_CHANNEL'] },
+                            { id: interaction.user.id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES', 'ATTACH_FILES', 'EMBED_LINKS'] },
+                            { id: rolPermitidoId, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'] }
+                        ]
+                    });
+
+                    db.run(`INSERT INTO tickets (creatorId, channelId) VALUES (?, ?)`, [interaction.user.id, ch.id], function(err) {
+                        const ticketDbId = this.lastID;
+                        const embedTicket = new MessageEmbed()
+                            .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
+                            .addFields(
+                                { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
+                                { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
+                                { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
+                            ).setTimestamp();
+
+                        const controlButtons = new MessageActionRow().addComponents(
+                            new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
+                            new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
+                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
+                        );
+
+                        ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] });
+                        ch.send({ embeds: [new MessageEmbed().setTitle("📋 Datos del Formulario").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
+                        interaction.editReply({ content: `✅ Ticket creado con éxito: ${ch}` });
+                    });
+                });
+            }
+        }
+    } catch (err) { console.error("Error detectado:", err); }
 });
 
-// --- FUNCIÓN CIERRE ---
+// --- FUNCIÓN CIERRE (TRANSCRIPTS INCLUIDOS) ---
 async function cerrarTicketFinal(interaction, ticket) {
     try {
         const attachment = await transcript.createTranscript(interaction.channel, {
@@ -290,7 +294,7 @@ async function cerrarTicketFinal(interaction, ticket) {
 
         db.run(`DELETE FROM tickets WHERE channelId = ?`, [interaction.channel.id]);
         await interaction.channel.delete();
-    } catch (e) { console.error(e); }
+    } catch (e) { console.error("Error al cerrar ticket:", e); }
 }
 
 // ==========================================
