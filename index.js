@@ -294,20 +294,34 @@ async function cerrarTicketFinal(interaction, ticket) {
 
 // --- LOGS AUDITORÍA ---
 client.on('messageDelete', async (message) => {
-    if (!message.guild || message.author?.bot) return;
+    // Si el mensaje es parcial (antiguo) o no tiene autor, no hacemos nada
+    if (message.partial || !message.author || message.author.bot) return;
+
     const embed = new MessageEmbed()
-        .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL() })
-        .setDescription(`**Autor:** ${message.author}\n**Canal:** ${message.channel}\n**Contenido:**\n${message.content || "_Sin texto_"}`)
-        .setColor("RED").setTimestamp();
+        .setAuthor({ 
+            name: `Mensaje Eliminado`, 
+            iconURL: message.author.displayAvatarURL({ dynamic: true }) 
+        })
+        .setDescription(`**Autor:** ${message.author}\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto_"}`)
+        .setColor("RED")
+        .setTimestamp();
+        
     enviarLog(embed);
 });
 
 client.on('messageUpdate', async (oldMessage, newMessage) => {
-    if (!oldMessage.guild || oldMessage.author?.bot || oldMessage.content === newMessage.content) return;
+    // Verificamos que el mensaje viejo tenga autor y que el contenido haya cambiado realmente
+    if (oldMessage.partial || !oldMessage.author || oldMessage.author.bot || oldMessage.content === newMessage.content) return;
+
     const embed = new MessageEmbed()
-        .setAuthor({ name: `Mensaje Editado`, iconURL: oldMessage.author.displayAvatarURL() })
-        .setDescription(`**Canal:** ${oldMessage.channel}\n**Antes:** ${oldMessage.content}\n**Después:** ${newMessage.content}`)
-        .setColor("YELLOW").setTimestamp();
+        .setAuthor({ 
+            name: `Mensaje Editado`, 
+            iconURL: oldMessage.author.displayAvatarURL({ dynamic: true }) 
+        })
+        .setDescription(`**Autor:** ${oldMessage.author}\n**Canal:** ${oldMessage.channel}\n\n**Antes:**\n${oldMessage.content}\n\n**Después:**\n${newMessage.content}`)
+        .setColor("YELLOW")
+        .setTimestamp();
+        
     enviarLog(embed);
 });
 
