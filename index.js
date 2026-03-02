@@ -22,7 +22,6 @@ const sqlite3 = require('sqlite3').verbose();
 moment.locale('es');
 
 // --- 🗄️ BASE DE DATOS ---
-// Asegúrate de que la carpeta DataBaseJson exista manualmente
 const db = new sqlite3.Database('./DataBaseJson/tickets.db');
 db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS tickets (
@@ -203,7 +202,7 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            // --- MOVIDO FUERA DE LA DB PARA QUE RESPONDA RÁPIDO ---
+            // --- ESTO DEBE IR ANTES DE LA DB PARA QUE EL MODAL ABRA RÁPIDO ---
             if (opc === "opc1") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
@@ -232,7 +231,7 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.showModal(m3);
             }
 
-            // Lógica de botones DENTRO del ticket
+            // Lógica de botones DENTRO del ticket (Cerrar, Reclamar, Notificar)
             db.get(`SELECT * FROM tickets WHERE channelId = ?`, [interaction.channel.id], async (err, ticket) => {
                 if (!ticket) return;
 
