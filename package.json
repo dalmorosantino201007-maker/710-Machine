@@ -38,6 +38,7 @@
     "otplib": "^12.0.1",
     "path": "^0.12.7",
     "quick.db": "^9.1.7",
+    "sodium-native": "^5.0.10",
     "speakeasy": "^2.0.0",
     "sqlite3": "^5.0.2",
     "wio.db": "^4.0.22"

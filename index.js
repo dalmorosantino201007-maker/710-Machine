@@ -101,18 +101,13 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE
-// ==========================================
-// ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE (CORREGIDO)
+// 🕹️ EVENTO: INTERACTION CREATE (MODIFICADO)
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
-        // --- 1. PRIORIDAD: BOTONES (Para evitar "Interacción Fallida" en Modales) ---
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            // Mostrar Modales (DEBE SER INSTANTÁNEO)
             if (opc === "opc1") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
@@ -141,14 +136,12 @@ client.on('interactionCreate', async (interaction) => {
                 return await interaction.showModal(m3);
             }
 
-            // Lógica de botones DENTRO del ticket (Cerrar, Reclamar, Notificar)
             db.get(`SELECT * FROM tickets WHERE channelId = ?`, [interaction.channel.id], async (err, ticket) => {
                 if (!ticket) return;
 
                 if (opc === "claim_ticket") {
                     if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el personal puede reclamar tickets.", ephemeral: true });
                     if (ticket.claimedBy) return interaction.reply({ content: `⚠️ Este ticket ya fue reclamado por <@${ticket.claimedBy}>`, ephemeral: true });
-
                     db.run(`UPDATE tickets SET claimedBy = ? WHERE channelId = ?`, [interaction.user.id, interaction.channel.id]);
                     return interaction.reply({ content: `✅ Ticket reclamado por ${interaction.user}` });
                 }
@@ -172,7 +165,6 @@ client.on('interactionCreate', async (interaction) => {
             });
         }
 
-        // --- 2. COMANDOS ---
         if (interaction.isCommand()) {
             const command = client.slashCommands.get(interaction.commandName);
             if (command) return await command.run(client, interaction);
@@ -193,7 +185,6 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // --- 3. ENVÍO DE FORMULARIOS (MODALS) ---
         if (interaction.isModalSubmit()) {
             if (interaction.customId.startsWith("modal_")) {
                 await interaction.deferReply({ ephemeral: true }); 
@@ -247,22 +238,33 @@ client.on('interactionCreate', async (interaction) => {
 
                     db.run(`INSERT INTO tickets (creatorId, channelId) VALUES (?, ?)`, [interaction.user.id, ch.id], function(err) {
                         const ticketDbId = this.lastID;
+                        
+                        // --- DISEÑO DE TICKET PERSONALIZADO (ESTILO IMAGEN) ---
                         const embedTicket = new MessageEmbed()
-                            .setTitle("SISTEMA DE TICKETS").setColor("#2f3136")
+                            .setAuthor({ name: '710 • Sistema de Tickets', iconURL: client.user.displayAvatarURL() })
+                            .setTitle("¡Ticket abierto!")
+                            .setDescription(`¡Hola! 👋 Bienvenido/a al **Sistema de Tickets** de **710**.\n\nNuestro equipo va a revisar tu consulta y te responderá lo antes posible. Mientras tanto, no cierres este canal. ⏳`)
+                            .setColor("#f1c40f")
+                            .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
                             .addFields(
-                                { name: '👤 Usuario', value: `${interaction.user}`, inline: true },
-                                { name: '🎟️ Ticket N°', value: `${ticketDbId}`, inline: true },
-                                { name: '🏷️ Categoría', value: `${ticketKey}`, inline: true }
-                            ).setTimestamp();
+                                { 
+                                    name: '📂 Información del ticket', 
+                                    value: `• **Canal:** ${ch}\n• **Categoría:** ${ticketKey}\n• **Estado:** ⏳ Esperando staff` 
+                                },
+                                { 
+                                    name: '🔧 Datos del Formulario', 
+                                    value: respuestas.map(r => `**${r.name}**\n\`\`\`${r.value}\`\`\``).join('\n') 
+                                }
+                            )
+                            .setFooter({ text: `Ticket N° ${ticketDbId} • ${new Date().toLocaleString()}`, iconURL: interaction.guild.iconURL() });
 
                         const controlButtons = new MessageActionRow().addComponents(
-                            new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("🔒").setStyle("DANGER"),
-                            new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS"),
-                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("PRIMARY")
+                            new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("❌").setStyle("DANGER"),
+                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar Usuario").setEmoji("📩").setStyle("SECONDARY"),
+                            new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS")
                         );
 
-                        ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] });
-                        ch.send({ embeds: [new MessageEmbed().setTitle("📋 Datos del Formulario").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
+                        ch.send({ content: `¡Hola! <@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] }).then(m => m.pin());
                         interaction.editReply({ content: `✅ Ticket creado con éxito: ${ch}` });
                     });
                 });
@@ -319,6 +321,8 @@ client.on('messageUpdate', async (oldMessage, newMessage) => {
 });
 
 // --- READY ---
+const { joinVoiceChannel } = require('@discordjs/voice');
+
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - ONLINE`);
     
@@ -326,16 +330,34 @@ client.on('ready', async () => {
     if (guild) {
         const voiceChannel = guild.channels.cache.get(canalVozId);
         if (voiceChannel) {
-            const { joinVoiceChannel } = require('@discordjs/voice');
             try {
                 joinVoiceChannel({
                     channelId: voiceChannel.id,
                     guildId: guild.id,
                     adapterCreator: guild.voiceAdapterCreator,
                     selfDeaf: true,
-                    selfMute: true 
+                    selfMute: true
                 });
-            } catch (e) { console.error("Error al unirse al canal de voz:", e); }
+                console.log(`🔊 Conectado al canal de voz: ${voiceChannel.name}`);
+            } catch (e) { 
+                console.error("Error al unirse al canal de voz:", e); 
+            }
+        }
+    }
+});
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+    if (oldState.member.id === client.user.id && !newState.channelId) {
+        const guild = client.guilds.cache.get(ID_SERVIDOR);
+        const voiceChannel = guild.channels.cache.get(canalVozId);
+        if (voiceChannel) {
+            joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: guild.id,
+                adapterCreator: guild.voiceAdapterCreator,
+                selfDeaf: true,
+                selfMute: true
+            });
         }
     }
 });
