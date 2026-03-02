@@ -27,19 +27,19 @@ module.exports = {
 
     let painel = new Discord.MessageActionRow().addComponents(
       new Discord.MessageButton()
-        .setCustomId("ticket_compra")
+        .setCustomId("opc1")
         .setLabel("Compra")
         .setEmoji("🛒")
         .setStyle("SECONDARY"),
 
       new Discord.MessageButton()
-        .setCustomId("ticket_soporte")
+        .setCustomId("opc2")
         .setLabel("Soporte")
         .setEmoji("🛠️")
         .setStyle("SECONDARY"),
 
       new Discord.MessageButton()
-        .setCustomId("ticket_partner")
+        .setCustomId("opc3")
         .setLabel("Partner")
         .setEmoji("🤝")
         .setStyle("SECONDARY")
