@@ -126,6 +126,9 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         if (interaction.isModalSubmit()) {
+            // USAMOS deferReply PARA EVITAR QUE LA INTERACCIÓN EXPIRE MIENTRAS CREAMOS EL CANAL
+            await interaction.deferReply({ ephemeral: true });
+
             if (interaction.customId.startsWith("modal_")) {
                 const opc = interaction.customId;
                 let nome, categoria, ticketKey, respuestas = [];
@@ -161,7 +164,7 @@ client.on('interactionCreate', async (interaction) => {
 
                 db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
                     if (row && interaction.guild.channels.cache.has(row.channelId)) {
-                        return interaction.reply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>`, ephemeral: true });
+                        return interaction.editReply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>` });
                     }
 
                     const ch = await interaction.guild.channels.create(nome, {
@@ -193,7 +196,7 @@ client.on('interactionCreate', async (interaction) => {
 
                         ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] });
                         ch.send({ embeds: [new MessageEmbed().setTitle("📋 Datos del Formulario").setColor("#2f3136").addFields(respuestas)] }).then(m => m.pin());
-                        interaction.reply({ content: `✅ Ticket creado con éxito: ${ch}`, ephemeral: true });
+                        interaction.editReply({ content: `✅ Ticket creado con éxito: ${ch}` });
                     });
                 });
             }
@@ -202,7 +205,7 @@ client.on('interactionCreate', async (interaction) => {
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            // --- ESTO DEBE IR ANTES DE LA DB PARA QUE EL MODAL ABRA RÁPIDO ---
+            // --- ESTOS MODALES DEBEN MOSTRARSE ANTES QUE CUALQUIER OTRA LÓGICA ---
             if (opc === "opc1") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
