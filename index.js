@@ -16,8 +16,8 @@ const path = require('path');
 const moment = require('moment');
 const transcript = require('discord-html-transcripts'); 
 const config = require('./DataBaseJson/config.json');
-const { authenticator } = require('otplib');
 const sqlite3 = require('sqlite3').verbose();
+const { joinVoiceChannel } = require('@discordjs/voice');
 
 moment.locale('es');
 
@@ -90,8 +90,7 @@ client.on('guildMemberAdd', async (member) => {
                 { name: "📅 Cuenta creada:", value: `${createdDate} (${createdRelative})`, inline: false },
                 { name: "📥 Se unió el:", value: `${joinedDate}`, inline: false },
                 { name: "👥 Total miembros:", value: `**${member.guild.memberCount}**`, inline: true },
-                { name: "🔢 Eres el número:", value: `**#${member.guild.memberCount}**`, inline: true },
-                { name: "📜 Reglas:", value: `No olvides leer las normas en <#1469950357785546853>`, inline: false }
+                { name: "🔢 Eres el número:", value: `**#${member.guild.memberCount}**`, inline: true }
             )
             .setFooter({ text: `710 Bot Shop • Disfruta tu estadía`, iconURL: member.guild.iconURL() })
             .setTimestamp();
@@ -101,14 +100,15 @@ client.on('guildMemberAdd', async (member) => {
 });
 
 // ==========================================
-// 🕹️ EVENTO: INTERACTION CREATE (MODIFICADO)
+// 🕹️ EVENTO: INTERACTION CREATE (ARREGLADO)
 // ==========================================
 client.on('interactionCreate', async (interaction) => {
     try {
         if (interaction.isButton()) {
             const opc = interaction.customId;
 
-            if (opc === "opc1") {
+            // --- ABRIR MODALES ---
+            if (opc === "opc1" || opc === "compra") {
                 const m1 = new Modal().setCustomId("modal_opc1").setTitle("Formulario de Compra");
                 m1.addComponents(
                     new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("¿Qué deseas comprar?").setStyle("SHORT").setRequired(true)),
@@ -117,7 +117,7 @@ client.on('interactionCreate', async (interaction) => {
                 );
                 return await interaction.showModal(m1);
             }
-            if (opc === "opc2") {
+            if (opc === "opc2" || opc === "soporte") {
                 const m2 = new Modal().setCustomId("modal_opc2").setTitle("Formulario de Soporte");
                 m2.addComponents(
                     new MessageActionRow().addComponents(new TextInputComponent().setCustomId("producto").setLabel("Producto/Servicio").setStyle("SHORT").setRequired(true)),
@@ -126,38 +126,41 @@ client.on('interactionCreate', async (interaction) => {
                 );
                 return await interaction.showModal(m2);
             }
-            if (opc === "opc3") {
+            if (opc === "opc3" || opc === "partner") {
                 const m3 = new Modal().setCustomId("modal_opc3").setTitle("Formulario de Partner");
                 m3.addComponents(
                     new MessageActionRow().addComponents(new TextInputComponent().setCustomId("servidor").setLabel("Link del Servidor").setStyle("SHORT").setRequired(true)),
-                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("miembros").setLabel("¿Cuántos miembros reales tiene?").setStyle("SHORT").setRequired(true)),
+                    new MessageActionRow().addComponents(new TextInputComponent().setCustomId("miembros").setLabel("¿Cuántos miembros tiene?").setStyle("SHORT").setRequired(true)),
                     new MessageActionRow().addComponents(new TextInputComponent().setCustomId("nuestroad").setLabel("¿Publicaste nuestro Ad?").setStyle("SHORT").setRequired(true))
                 );
                 return await interaction.showModal(m3);
             }
 
+            // --- ACCIONES DE TICKET ---
             db.get(`SELECT * FROM tickets WHERE channelId = ?`, [interaction.channel.id], async (err, ticket) => {
                 if (!ticket) return;
 
                 if (opc === "claim_ticket") {
-                    if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo el personal puede reclamar tickets.", ephemeral: true });
-                    if (ticket.claimedBy) return interaction.reply({ content: `⚠️ Este ticket ya fue reclamado por <@${ticket.claimedBy}>`, ephemeral: true });
+                    if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Solo personal autorizado.", ephemeral: true });
+                    if (ticket.claimedBy) return interaction.reply({ content: `⚠️ Ya reclamado por <@${ticket.claimedBy}>`, ephemeral: true });
+                    
                     db.run(`UPDATE tickets SET claimedBy = ? WHERE channelId = ?`, [interaction.user.id, interaction.channel.id]);
                     return interaction.reply({ content: `✅ Ticket reclamado por ${interaction.user}` });
                 }
 
                 if (opc === "notify_ticket") {
+                    await interaction.deferReply({ ephemeral: true });
                     const creador = await interaction.guild.members.fetch(ticket.creatorId).catch(() => null);
                     if (creador) {
-                        creador.send(`🔔 **Atención:** El staff te está esperando en tu ticket: ${interaction.channel}`).catch(() => {});
-                        return interaction.reply({ content: "✅ Se ha enviado un MD al creador del ticket.", ephemeral: true });
+                        creador.send(`🔔 **Atención:** El staff te espera en tu ticket: ${interaction.channel}`).catch(() => {});
+                        return interaction.editReply({ content: "✅ Notificación enviada al usuario." });
                     }
-                    return interaction.reply({ content: "❌ No pude enviar el mensaje.", ephemeral: true });
+                    return interaction.editReply({ content: "❌ No se pudo notificar al usuario." });
                 }
 
                 if (opc === "fechar_ticket") {
                     if (!interaction.member.roles.cache.has(rolPermitidoId) && interaction.user.id !== ticket.creatorId) {
-                        return interaction.reply({ content: "❌ No tienes permiso para cerrar este ticket.", ephemeral: true });
+                        return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
                     }
                     await interaction.reply("🔒 Cerrando ticket en 5 segundos...");
                     setTimeout(() => cerrarTicketFinal(interaction, ticket), 5000);
@@ -170,7 +173,7 @@ client.on('interactionCreate', async (interaction) => {
             if (command) return await command.run(client, interaction);
 
             if (interaction.commandName === "renvembed") {
-                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ No tienes permiso.", ephemeral: true });
+                if (!interaction.member.roles.cache.has(rolPermitidoId)) return interaction.reply({ content: "❌ Sin permisos.", ephemeral: true });
                 const embedPanel = new MessageEmbed()
                     .setTitle("📩 CENTRO DE ATENCIÓN")
                     .setDescription("Selecciona una opción para abrir un ticket.")
@@ -198,7 +201,7 @@ client.on('interactionCreate', async (interaction) => {
                     ticketKey = "Compra";
                     respuestas = [
                         { name: "🛒 Producto:", value: interaction.fields.getTextInputValue("producto") },
-                        { name: "💳 Método de pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
+                        { name: "💳 Pago:", value: interaction.fields.getTextInputValue("metodo_pago") },
                         { name: "📄 Cantidad:", value: interaction.fields.getTextInputValue("cantidad_compra") }
                     ];
                 } else if (opc === "modal_opc2") {
@@ -208,7 +211,7 @@ client.on('interactionCreate', async (interaction) => {
                     respuestas = [
                         { name: "🔨 Producto:", value: interaction.fields.getTextInputValue("producto") },
                         { name: "⚠️ Problema:", value: interaction.fields.getTextInputValue("problema") },
-                        { name: "📄 Info adicional:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
+                        { name: "📄 Info:", value: interaction.fields.getTextInputValue("informacion_extra") || "Ninguna" }
                     ];
                 } else if (opc === "modal_opc3") {
                     nome = `🤝・${interaction.user.username}`;
@@ -216,14 +219,14 @@ client.on('interactionCreate', async (interaction) => {
                     ticketKey = "Partner";
                     respuestas = [
                         { name: "🌐 Servidor:", value: interaction.fields.getTextInputValue("servidor") },
-                        { name: "👥 ¿+250 Miembros?:", value: interaction.fields.getTextInputValue("miembros") },
-                        { name: "🎯 Ya envio nuestro ad:", value: interaction.fields.getTextInputValue("nuestroad") }
+                        { name: "👥 Miembros:", value: interaction.fields.getTextInputValue("miembros") },
+                        { name: "🎯 Publicidad:", value: interaction.fields.getTextInputValue("nuestroad") }
                     ];
                 }
 
                 db.get(`SELECT channelId FROM tickets WHERE creatorId = ?`, [interaction.user.id], async (err, row) => {
                     if (row && interaction.guild.channels.cache.has(row.channelId)) {
-                        return interaction.editReply({ content: `⚠️ Ya tienes un ticket abierto: <#${row.channelId}>` });
+                        return interaction.editReply({ content: `⚠️ Ya tienes un ticket: <#${row.channelId}>` });
                     }
 
                     const ch = await interaction.guild.channels.create(nome, {
@@ -238,48 +241,38 @@ client.on('interactionCreate', async (interaction) => {
 
                     db.run(`INSERT INTO tickets (creatorId, channelId) VALUES (?, ?)`, [interaction.user.id, ch.id], function(err) {
                         const ticketDbId = this.lastID;
-                        
-                        // --- DISEÑO DE TICKET PERSONALIZADO (ESTILO IMAGEN) ---
                         const embedTicket = new MessageEmbed()
                             .setAuthor({ name: '710 • Sistema de Tickets', iconURL: client.user.displayAvatarURL() })
                             .setTitle("¡Ticket abierto!")
-                            .setDescription(`¡Hola! 👋 Bienvenido/a al **Sistema de Tickets** de **710**.\n\nNuestro equipo va a revisar tu consulta y te responderá lo antes posible. Mientras tanto, no cierres este canal. ⏳`)
+                            .setDescription(`¡Hola! 👋 Nuestro equipo te atenderá pronto.`)
                             .setColor("#f1c40f")
-                            .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
                             .addFields(
-                                { 
-                                    name: '📂 Información del ticket', 
-                                    value: `• **Canal:** ${ch}\n• **Categoría:** ${ticketKey}\n• **Estado:** ⏳ Esperando staff` 
-                                },
-                                { 
-                                    name: '🔧 Datos del Formulario', 
-                                    value: respuestas.map(r => `**${r.name}**\n\`\`\`${r.value}\`\`\``).join('\n') 
-                                }
+                                { name: '📂 Info', value: `• **Canal:** ${ch}\n• **Categoría:** ${ticketKey}`, inline: true },
+                                { name: '🔧 Formulario', value: respuestas.map(r => `**${r.name}**\n\`${r.value}\``).join('\n') }
                             )
-                            .setFooter({ text: `Ticket N° ${ticketDbId} • ${new Date().toLocaleString()}`, iconURL: interaction.guild.iconURL() });
+                            .setFooter({ text: `Ticket N° ${ticketDbId}` });
 
-                        const controlButtons = new MessageActionRow().addComponents(
+                        const rowButtons = new MessageActionRow().addComponents(
                             new MessageButton().setCustomId("fechar_ticket").setLabel("Cerrar").setEmoji("❌").setStyle("DANGER"),
-                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar Usuario").setEmoji("📩").setStyle("SECONDARY"),
+                            new MessageButton().setCustomId("notify_ticket").setLabel("Notificar").setEmoji("📩").setStyle("SECONDARY"),
                             new MessageButton().setCustomId("claim_ticket").setLabel("Reclamar").setEmoji("✅").setStyle("SUCCESS")
                         );
 
-                        ch.send({ content: `¡Hola! <@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [controlButtons] }).then(m => m.pin());
-                        interaction.editReply({ content: `✅ Ticket creado con éxito: ${ch}` });
+                        ch.send({ content: `<@${interaction.user.id}> | <@&${rolPermitidoId}>`, embeds: [embedTicket], components: [rowButtons] });
+                        interaction.editReply({ content: `✅ Ticket creado: ${ch}` });
                     });
                 });
             }
         }
-    } catch (err) { console.error("Error detectado:", err); }
+    } catch (err) { console.error("Error interacción:", err); }
 });
 
-// --- FUNCIÓN CIERRE (TRANSCRIPTS INCLUIDOS) ---
+// --- CIERRE DE TICKETS ---
 async function cerrarTicketFinal(interaction, ticket) {
     try {
         const attachment = await transcript.createTranscript(interaction.channel, {
             limit: -1,
-            fileName: `transcript-${interaction.channel.name}.html`,
-            returnBuffer: false
+            fileName: `transcript-${interaction.channel.name}.html`
         });
 
         const embedCierre = new MessageEmbed()
@@ -288,7 +281,7 @@ async function cerrarTicketFinal(interaction, ticket) {
             .addFields(
                 { name: '🎟️ Canal', value: `\`${interaction.channel.name}\``, inline: true },
                 { name: '👤 Creador', value: `<@${ticket.creatorId}>`, inline: true },
-                { name: '🔒 Cerrado por', value: `${interaction.user.tag}`, inline: true }
+                { name: '🔒 Por', value: `${interaction.user.tag}`, inline: true }
             ).setTimestamp();
 
         const logChan = interaction.guild.channels.cache.get(canalTranscriptsId);
@@ -296,17 +289,15 @@ async function cerrarTicketFinal(interaction, ticket) {
 
         db.run(`DELETE FROM tickets WHERE channelId = ?`, [interaction.channel.id]);
         await interaction.channel.delete();
-    } catch (e) { console.error("Error al cerrar ticket:", e); }
+    } catch (e) { console.error("Error cierre:", e); }
 }
 
-// ==========================================
-// 📡 AUDITORÍA / LOGS
-// ==========================================
+// --- LOGS AUDITORÍA ---
 client.on('messageDelete', async (message) => {
     if (!message.guild || message.author?.bot) return;
     const embed = new MessageEmbed()
-        .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-        .setDescription(`**Autor:** ${message.author} (${message.author.id})\n**Canal:** ${message.channel}\n\n**Contenido:**\n${message.content || "_Sin contenido de texto_"}`)
+        .setAuthor({ name: `Mensaje Eliminado`, iconURL: message.author.displayAvatarURL() })
+        .setDescription(`**Autor:** ${message.author}\n**Canal:** ${message.channel}\n**Contenido:**\n${message.content || "_Sin texto_"}`)
         .setColor("RED").setTimestamp();
     enviarLog(embed);
 });
@@ -314,18 +305,17 @@ client.on('messageDelete', async (message) => {
 client.on('messageUpdate', async (oldMessage, newMessage) => {
     if (!oldMessage.guild || oldMessage.author?.bot || oldMessage.content === newMessage.content) return;
     const embed = new MessageEmbed()
-        .setAuthor({ name: `Mensaje Editado`, iconURL: oldMessage.author.displayAvatarURL({ dynamic: true }) })
-        .setDescription(`**Autor:** ${oldMessage.author}\n**Canal:** ${oldMessage.channel}\n\n**Antes:**\n${oldMessage.content}\n\n**Después:**\n${newMessage.content}`)
+        .setAuthor({ name: `Mensaje Editado`, iconURL: oldMessage.author.displayAvatarURL() })
+        .setDescription(`**Canal:** ${oldMessage.channel}\n**Antes:** ${oldMessage.content}\n**Después:** ${newMessage.content}`)
         .setColor("YELLOW").setTimestamp();
     enviarLog(embed);
 });
 
-// --- READY ---
-const { joinVoiceChannel } = require('@discordjs/voice');
-
+// --- READY Y VOZ ---
 client.on('ready', async () => {
     console.log(`🔥 ${client.user.username} - ONLINE`);
     
+    // Conexión inicial a voz
     const guild = client.guilds.cache.get(ID_SERVIDOR);
     if (guild) {
         const voiceChannel = guild.channels.cache.get(canalVozId);
@@ -338,14 +328,14 @@ client.on('ready', async () => {
                     selfDeaf: true,
                     selfMute: true
                 });
-                console.log(`🔊 Conectado al canal de voz: ${voiceChannel.name}`);
-            } catch (e) { 
-                console.error("Error al unirse al canal de voz:", e); 
-            }
+            } catch (e) { console.error("Error voz:", e); }
         }
     }
+
+    client.user.setActivity("discord.gg/710shop", { type: "WATCHING" });
 });
 
+// Auto-reconexión si lo desconectan
 client.on('voiceStateUpdate', (oldState, newState) => {
     if (oldState.member.id === client.user.id && !newState.channelId) {
         const guild = client.guilds.cache.get(ID_SERVIDOR);
